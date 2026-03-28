@@ -124,6 +124,30 @@ export default function Dashboard() {
   
   // SIREN modal
   const [sirenModal, setSirenModal] = useState(null);
+  
+  // Advanced filters
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    distPosteMax: 20, // km
+    distLandingMax: 500, // km
+    surfaceMin: 0, // ha
+    surfaceMax: 100, // ha
+    pluZones: [], // empty = all
+  });
+  
+  // Available PLU zones
+  const PLU_OPTIONS = [
+    { value: 'I', label: 'I - Zone industrielle' },
+    { value: 'IX', label: 'IX - Industrielle étendue' },
+    { value: 'UX', label: 'UX - Urbaine activités' },
+    { value: 'UI', label: 'UI - Urbaine industrielle' },
+    { value: 'UE', label: 'UE - Urbaine économique' },
+    { value: 'AUX', label: 'AUX - À urbaniser activités' },
+    { value: 'AU', label: 'AU - À urbaniser' },
+    { value: '1AU', label: '1AU - AU ouvert' },
+    { value: '2AU', label: '2AU - AU fermé' },
+    { value: 'U', label: 'U - Zone urbaine' },
+  ];
 
   // Fetch parcels
   useEffect(() => {
@@ -135,6 +159,27 @@ export default function Dashboard() {
   useEffect(() => {
     fetchMapLayers();
   }, []);
+  
+  // Apply advanced filters client-side
+  const filteredParcels = parcels.filter(p => {
+    // Distance poste HTB
+    const distPoste = (p.dist_poste_htb_m || 50000) / 1000;
+    if (distPoste > filters.distPosteMax) return false;
+    
+    // Distance landing point
+    const distLanding = p.dist_landing_point_km || 1000;
+    if (distLanding > filters.distLandingMax) return false;
+    
+    // Surface
+    const surface = p.surface_ha || 0;
+    if (surface < filters.surfaceMin) return false;
+    if (filters.surfaceMax > 0 && surface > filters.surfaceMax) return false;
+    
+    // PLU zones
+    if (filters.pluZones.length > 0 && !filters.pluZones.includes(p.plu_zone)) return false;
+    
+    return true;
+  });
 
   const fetchParcels = async () => {
     setLoading(true);
@@ -348,6 +393,20 @@ export default function Dashboard() {
           </div>
 
           <button
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className={`h-8 px-3 flex items-center gap-1 text-xs font-mono uppercase border transition-colors ${
+              showAdvancedFilters ? 'border-[#00d4aa] text-[#00d4aa]' : 'border-[#1f1f2e] text-[#8f8f9d]'
+            }`}
+            data-testid="advanced-filters-btn"
+          >
+            <Filter size={12} />
+            Filtres avancés
+            {(filters.pluZones.length > 0 || filters.distPosteMax < 20 || filters.distLandingMax < 500 || filters.surfaceMin > 0) && (
+              <span className="ml-1 w-2 h-2 rounded-full" style={{ background: '#00d4aa' }}></span>
+            )}
+          </button>
+
+          <button
             onClick={fetchParcels}
             className="btn-primary flex items-center gap-1"
             data-testid="refresh-btn"
@@ -358,10 +417,121 @@ export default function Dashboard() {
 
           <div className="ml-auto flex items-center gap-4">
             <span className="text-xs font-mono" style={{ color: '#8f8f9d' }}>
-              {parcels.length} sites · {postes.length} postes · {landingPoints.length} landing pts
+              {filteredParcels.length}/{parcels.length} sites · {postes.length} postes · {landingPoints.length} landing pts
             </span>
           </div>
         </div>
+
+        {/* Advanced Filters Panel */}
+        {showAdvancedFilters && (
+          <div 
+            className="px-4 py-3 flex flex-wrap items-center gap-6"
+            style={{ background: '#12121a', borderBottom: '1px solid #1f1f2e' }}
+          >
+            {/* Distance Poste HTB */}
+            <div className="flex items-center gap-2">
+              <Zap size={14} style={{ color: '#ffa502' }} />
+              <label className="text-xs" style={{ color: '#8f8f9d' }}>Dist. poste RTE max:</label>
+              <input
+                type="number"
+                min="1"
+                max="50"
+                value={filters.distPosteMax}
+                onChange={(e) => setFilters(f => ({ ...f, distPosteMax: parseInt(e.target.value) || 20 }))}
+                className="w-16 h-7 px-2 text-xs text-center"
+              />
+              <span className="text-xs" style={{ color: '#8f8f9d' }}>km</span>
+            </div>
+
+            {/* Distance Landing Point */}
+            <div className="flex items-center gap-2">
+              <Anchor size={14} style={{ color: '#00d4aa' }} />
+              <label className="text-xs" style={{ color: '#8f8f9d' }}>Dist. landing point max:</label>
+              <input
+                type="number"
+                min="10"
+                max="1000"
+                step="10"
+                value={filters.distLandingMax}
+                onChange={(e) => setFilters(f => ({ ...f, distLandingMax: parseInt(e.target.value) || 500 }))}
+                className="w-20 h-7 px-2 text-xs text-center"
+              />
+              <span className="text-xs" style={{ color: '#8f8f9d' }}>km</span>
+            </div>
+
+            {/* Surface */}
+            <div className="flex items-center gap-2">
+              <Square size={14} style={{ color: '#3b82f6' }} />
+              <label className="text-xs" style={{ color: '#8f8f9d' }}>Surface:</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.5"
+                value={filters.surfaceMin}
+                onChange={(e) => setFilters(f => ({ ...f, surfaceMin: parseFloat(e.target.value) || 0 }))}
+                className="w-16 h-7 px-2 text-xs text-center"
+                placeholder="Min"
+              />
+              <span className="text-xs" style={{ color: '#8f8f9d' }}>-</span>
+              <input
+                type="number"
+                min="0"
+                max="200"
+                step="1"
+                value={filters.surfaceMax}
+                onChange={(e) => setFilters(f => ({ ...f, surfaceMax: parseFloat(e.target.value) || 100 }))}
+                className="w-16 h-7 px-2 text-xs text-center"
+                placeholder="Max"
+              />
+              <span className="text-xs" style={{ color: '#8f8f9d' }}>ha</span>
+            </div>
+
+            {/* PLU Zones */}
+            <div className="flex items-center gap-2">
+              <MapIcon size={14} style={{ color: '#8b5cf6' }} />
+              <label className="text-xs" style={{ color: '#8f8f9d' }}>Zones PLU:</label>
+              <div className="relative">
+                <select
+                  multiple
+                  value={filters.pluZones}
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.selectedOptions, opt => opt.value);
+                    setFilters(f => ({ ...f, pluZones: selected }));
+                  }}
+                  className="h-7 px-2 text-xs"
+                  style={{ minWidth: 180 }}
+                  data-testid="plu-filter"
+                >
+                  {PLU_OPTIONS.map(plu => (
+                    <option key={plu.value} value={plu.value}>{plu.label}</option>
+                  ))}
+                </select>
+              </div>
+              {filters.pluZones.length > 0 && (
+                <span className="text-xs font-mono" style={{ color: '#00d4aa' }}>
+                  {filters.pluZones.length} sélectionné(s)
+                </span>
+              )}
+            </div>
+
+            {/* Reset button */}
+            <button
+              onClick={() => setFilters({
+                distPosteMax: 20,
+                distLandingMax: 500,
+                surfaceMin: 0,
+                surfaceMax: 100,
+                pluZones: [],
+              })}
+              className="text-xs flex items-center gap-1 hover:text-[#ff4757]"
+              style={{ color: '#8f8f9d' }}
+            >
+              <XCircle size={12} />
+              Réinitialiser
+            </button>
+          </div>
+        )}
 
         {/* Main content area */}
         <div className="flex-1 flex overflow-hidden">
@@ -383,7 +553,7 @@ export default function Dashboard() {
                       url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     />
-                    <MapBounds parcels={parcels} />
+                    <MapBounds parcels={filteredParcels} />
                     
                     {/* Submarine cables */}
                     {layers.submarine_cables && submarineCables.map(cable => (
@@ -498,7 +668,7 @@ export default function Dashboard() {
                     ))}
                     
                     {/* Parcels */}
-                    {layers.parcels && parcels.map(parcel => {
+                    {layers.parcels && filteredParcels.map(parcel => {
                       const score = parcel.score?.score_net || 0;
                       const mw = parcel.score?.power_mw_p50 || 10;
                       
@@ -659,23 +829,23 @@ export default function Dashboard() {
                     
                     {/* Quick stats */}
                     <div className="mt-6 space-y-3">
-                      <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Statistiques</p>
+                      <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Statistiques (filtrées)</p>
                       <div className="flex items-center justify-between">
                         <span className="text-xs" style={{ color: '#8f8f9d' }}>Sites GO</span>
                         <span className="font-mono text-sm" style={{ color: '#00d4aa' }}>
-                          {parcels.filter(p => p.score?.verdict === 'GO').length}
+                          {filteredParcels.filter(p => p.score?.verdict === 'GO').length}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs" style={{ color: '#8f8f9d' }}>Sites CONDITIONNEL</span>
                         <span className="font-mono text-sm" style={{ color: '#ffa502' }}>
-                          {parcels.filter(p => p.score?.verdict === 'CONDITIONNEL').length}
+                          {filteredParcels.filter(p => p.score?.verdict === 'CONDITIONNEL').length}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs" style={{ color: '#8f8f9d' }}>Sites NO-GO</span>
                         <span className="font-mono text-sm" style={{ color: '#ff4757' }}>
-                          {parcels.filter(p => p.score?.verdict === 'NO_GO').length}
+                          {filteredParcels.filter(p => p.score?.verdict === 'NO_GO').length}
                         </span>
                       </div>
                     </div>
@@ -687,7 +857,7 @@ export default function Dashboard() {
 
           {activeView === 'table' && (
             <div className="flex-1 overflow-auto p-4">
-              <ParcelsTable parcels={parcels} projectType={projectType} onSelect={handleParcelClick} />
+              <ParcelsTable parcels={filteredParcels} projectType={projectType} onSelect={handleParcelClick} />
             </div>
           )}
 
