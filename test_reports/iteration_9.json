@@ -1,0 +1,102 @@
+{
+  "summary": "Full Application Test (Iteration 9) - DVF, PDF Export, CRM Removal. All 22 backend tests passed. Frontend fully functional with DVF prices, PDF export button, and CRM correctly removed from navigation.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "=== DVF ENDPOINTS (6/6) ===",
+    "GET /api/dvf/commune/62193 returns Pas-de-Calais data with prix_median_m2=45",
+    "GET /api/dvf/commune/13055 returns Bouches-du-Rhône data with prix_median_m2=120",
+    "GET /api/dvf/region/PACA returns aggregated data with departements list",
+    "GET /api/dvf/region/IDF returns IDF data",
+    "GET /api/dvf/region/HdF returns HdF data",
+    "GET /api/france/parcelles/bbox includes dvf_prix_median_m2, dvf_prix_q1_m2, dvf_prix_q3_m2 fields",
+    "=== PDF EXPORT (3/3) ===",
+    "POST /api/export/pdf with parcel data returns valid PDF (Content-Type: application/pdf, starts with %PDF)",
+    "POST /api/export/pdf/dc-site with valid site_id returns PDF",
+    "POST /api/export/pdf/dc-site with invalid site_id returns 404",
+    "=== CORE FEATURES (10/10) ===",
+    "GET /api/map/electrical-assets returns postes with S3REnR data",
+    "GET /api/s3renr/summary returns 3 regions (IDF, PACA, HdF)",
+    "GET /api/s3renr/top-opportunities returns ranked list",
+    "POST /api/dc/search with PACA returns scored results",
+    "POST /api/dc/search with IDF returns results",
+    "GET /api/dc/site/dc_htb_hdf_001 returns site detail",
+    "POST /api/chat with '50MW en PACA' returns search_results",
+    "GET /api/gpt/config returns GPT configuration",
+    "GET /api/gpt/openapi-schema returns valid schema",
+    "=== MAP DATA (4/4) ===",
+    "GET /api/map/landing-points returns data",
+    "GET /api/map/dc returns data",
+    "GET /api/map/submarine-cables returns data",
+    "GET /api/france/communes?q=Calais returns results",
+    "=== FRONTEND DESKTOP ===",
+    "Dashboard loads with COCKPIT IMMO header",
+    "Map container visible with Leaflet",
+    "Navigation tabs (Carte, Tableau) visible",
+    "CRM tab NOT present (correctly removed)",
+    "Layers toggle button visible with all layer options",
+    "S3REnR summary panel visible in sidebar with 3 regions",
+    "Legend visible with S3REnR status colors",
+    "Commune search works (Calais results shown)",
+    "Chatbot open button visible (data-testid=chatbot-open-btn)",
+    "Chatbot panel opens on click with input and send button",
+    "Chatbot returns search results (5 results for '50MW en PACA')",
+    "Table view loads with PLU column",
+    "GPT Agent page (/gpt-agent) loads with setup instructions",
+    "=== FRONTEND PARCEL DETAIL ===",
+    "ParcelDetail panel opens when clicking parcel",
+    "DVF text visible in ParcelDetail (Prix DVF €/m², Transactions DVF)",
+    "PDF Export button visible (data-testid=export-pdf-btn)",
+    "=== MOBILE RESPONSIVE ===",
+    "Map renders on mobile viewport (390x844)",
+    "Mobile bottom navigation visible (Carte, Tableau)",
+    "CRM NOT in mobile nav (correctly removed)",
+    "Mobile filters button visible",
+    "Mobile layers button visible"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_full_app_iteration9.py",
+    "/app/test_reports/pytest/pytest_results_iteration9.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_full_app_iteration9.py"
+  ],
+  "success_rate": {
+    "backend": "100% (22/22 tests passed)",
+    "frontend": "100% (all features working)"
+  },
+  "test_credentials": "Cookie: session_token=test_session_token_2026",
+  "seed_data_creation": "No seed data needed - uses dvf_data.py for DVF prices, dc_search_api.py for sites",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Full app test completed. New features: 1) DVF endpoints at /api/dvf/commune/{code} and /api/dvf/region/{region} return price data from dvf_data.py. 2) PDF export at /api/export/pdf and /api/export/pdf/dc-site using reportlab. 3) CRM removed from both desktop and mobile navigation. ParcelDetail shows DVF section when parcel has dvf_prix_median_m2 > 0. PDF export button has data-testid=export-pdf-btn. All previous features (S3REnR, chatbot, GPT agent, DC search) still working.",
+  "feature_verification": {
+    "dvf_endpoints": {
+      "commune": "/api/dvf/commune/{code_insee} - returns prix_median_m2, prix_q1_m2, prix_q3_m2",
+      "region": "/api/dvf/region/{region} - returns aggregated data with departements list",
+      "bbox_parcels": "/api/france/parcelles/bbox includes dvf_prix_median_m2, dvf_prix_q1_m2, dvf_prix_q3_m2"
+    },
+    "pdf_export": {
+      "parcel": "POST /api/export/pdf - accepts parcel JSON, returns PDF",
+      "dc_site": "POST /api/export/pdf/dc-site - accepts {site_id}, returns PDF or 404"
+    },
+    "crm_removed": {
+      "desktop_nav": "No CRM tab in desktop navigation",
+      "mobile_nav": "No CRM tab in mobile bottom navigation"
+    }
+  },
+  "frontend_verification": {
+    "parcel_detail_dvf": "DVF section shows when parcel has dvf_prix_median_m2 > 0",
+    "pdf_export_button": "data-testid=export-pdf-btn in ParcelDetail component",
+    "s3renr_summary": "data-testid=s3renr-summary shows 3 regions (IDF SATURE, PACA ACTIF, HdF ACTIF)"
+  }
+}

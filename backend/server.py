@@ -32,6 +32,8 @@ from s3renr_data import S3RENR_DATA, get_s3renr_top_opportunities
 from dc_search_api import dc_search, dc_get_site
 from gpt_agent_config import get_openapi_schema, COCKPIT_IMMO_GPT_SYSTEM_PROMPT
 from chat_assistant import process_chat_message
+from dvf_data import get_dvf_for_commune, get_dvf_for_region
+from pdf_export import generate_parcel_pdf
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -733,6 +735,90 @@ async def get_dc_site_detail(site_id: str):
 
 
 # ═══════════════════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════════════════
+# DVF (Demandes de Valeurs Foncières) ENDPOINTS
+# ═══════════════════════════════════════════════════════════
+
+@api_router.get("/dvf/commune/{code_insee}")
+async def get_dvf_commune(code_insee: str):
+    """Get DVF price data for a commune (€/m² terrain)"""
+    return get_dvf_for_commune(code_insee)
+
+
+@api_router.get("/dvf/region/{region}")
+async def get_dvf_region(region: str):
+    """Get aggregated DVF price data for a region"""
+    return get_dvf_for_region(region)
+
+
+# ═══════════════════════════════════════════════════════════
+# PDF EXPORT ENDPOINTS
+# ═══════════════════════════════════════════════════════════
+
+@api_router.post("/export/pdf")
+async def export_parcel_pdf(parcel: Dict[str, Any]):
+    """Generate a PDF fiche for a parcel or DC site"""
+    from starlette.responses import Response
+    
+    # Get DVF data based on parcel info
+    code_insee = parcel.get("code_commune", "")
+    code_dep = parcel.get("code_dep", "")
+    dvf = None
+    if code_insee:
+        dvf = get_dvf_for_commune(code_insee)
+    elif code_dep:
+        dvf = get_dvf_for_commune(code_dep + "000")
+    
+    pdf_bytes = generate_parcel_pdf(parcel, dvf)
+    
+    commune = parcel.get("commune", parcel.get("name", "site"))
+    filename = f"cockpit_immo_{commune.replace(' ', '_')}.pdf"
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@api_router.post("/export/pdf/dc-site")
+async def export_dc_site_pdf(request: Dict[str, Any]):
+    """Generate PDF fiche for a DC site (from search results)"""
+    from starlette.responses import Response
+    
+    site_id = request.get("site_id", "")
+    site = dc_get_site(site_id)
+    if not site:
+        raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
+    
+    # Get DVF data for the site's region
+    region = site.get("location", {}).get("region", "")
+    dvf = get_dvf_for_region(region) if region else None
+    
+    # Convert DVF region data to parcel-compatible format
+    dvf_parcel = None
+    if dvf and not dvf.get("error"):
+        dvf_parcel = {
+            "prix_median_m2": dvf.get("prix_moyen_pondere_m2", 65),
+            "prix_q1_m2": dvf.get("prix_min_m2", 35),
+            "prix_q3_m2": dvf.get("prix_max_m2", 110),
+            "nb_transactions": dvf.get("nb_transactions_total", 0),
+            "source": f"DVF {region} ({dvf.get('nb_departements', 0)} départements)",
+        }
+    
+    pdf_bytes = generate_parcel_pdf(site, dvf_parcel)
+    
+    city = site.get("location", {}).get("city", "site")
+    filename = f"cockpit_immo_DC_{city.replace(' ', '_')}.pdf"
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 # AI CHAT ASSISTANT ENDPOINT
 # ═══════════════════════════════════════════════════════════
 
@@ -982,6 +1068,15 @@ async def get_bbox_parcelles(
             parsed["landing_point_nb_cables"] = nearest_lp_cables
             parsed["dist_backbone_fibre_m"] = 2000
             parsed["nb_operateurs_fibre"] = 2
+            
+            # DVF price data
+            code_dep = parsed.get("departement", "")
+            if code_dep:
+                dvf = get_dvf_for_commune(code_dep + "000")
+                parsed["dvf_prix_median_m2"] = dvf.get("prix_median_m2", 0)
+                parsed["dvf_prix_q1_m2"] = dvf.get("prix_q1_m2", 0)
+                parsed["dvf_prix_q3_m2"] = dvf.get("prix_q3_m2", 0)
+                parsed["dvf_source"] = dvf.get("source", "")
             
             # Assign PLU zone from GPU data (nearest zone)
             plu_zone = "inconnu"

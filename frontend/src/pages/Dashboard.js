@@ -6,7 +6,7 @@ import {
   Server, Map as MapIcon, Table, Bell, Settings, LogOut, 
   Search, Filter, ChevronDown, ChevronUp, Plus, Zap, Wifi, Droplets, Square,
   TrendingUp, Clock, AlertTriangle, CheckCircle, XCircle, RefreshCw,
-  Layers, Eye, EyeOff, Anchor, Cable, Building2, ExternalLink, X, Loader, Menu
+  Layers, Eye, EyeOff, Anchor, Cable, Building2, ExternalLink, X, Loader, Menu, FileDown
 } from 'lucide-react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents, Marker, Polyline, Polygon as LeafletPolygon } from 'react-leaflet';
 import L from 'leaflet';
@@ -1840,6 +1840,62 @@ function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
             </div>
           </div>
         </div>
+
+        {/* DVF Prix foncier */}
+        {parcel.dvf_prix_median_m2 > 0 && (
+          <div className="panel p-3" data-testid="dvf-section">
+            <p className="text-xs font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>DVF — Prix foncier (département)</p>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span style={{ color: '#8f8f9d' }}>Prix médian terrain</span>
+                <span className="font-mono font-bold" style={{ color: '#ffa502' }}>
+                  {parcel.dvf_prix_median_m2} €/m²
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span style={{ color: '#8f8f9d' }}>Fourchette (Q1-Q3)</span>
+                <span className="font-mono" style={{ color: '#e8e8ed' }}>
+                  {parcel.dvf_prix_q1_m2} - {parcel.dvf_prix_q3_m2} €/m²
+                </span>
+              </div>
+              {parcel.surface_m2 > 0 && (
+                <div className="flex justify-between mt-1 pt-1" style={{ borderTop: '1px solid #1f1f2e' }}>
+                  <span style={{ color: '#8f8f9d' }}>Estimation terrain</span>
+                  <span className="font-mono font-bold" style={{ color: '#00d4aa' }}>
+                    {((parcel.surface_m2 * parcel.dvf_prix_median_m2) / 1e6).toFixed(2)} M€
+                  </span>
+                </div>
+              )}
+              <p className="text-[9px] mt-1" style={{ color: '#555' }}>{parcel.dvf_source}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Export PDF */}
+        <button
+          onClick={async () => {
+            try {
+              const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/export/pdf`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(parcel),
+              });
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `cockpit_immo_${parcel.commune || 'site'}.pdf`;
+              a.click();
+              URL.revokeObjectURL(url);
+            } catch (e) { console.error('PDF export error:', e); }
+          }}
+          className="w-full flex items-center justify-center gap-2 py-2 text-xs font-mono uppercase rounded"
+          style={{ background: '#00d4aa22', color: '#00d4aa', border: '1px solid #00d4aa33' }}
+          data-testid="export-pdf-btn"
+        >
+          <FileDown size={14} />
+          Exporter Fiche PDF
+        </button>
 
         {/* Confidence */}
         <div className="flex items-center justify-between text-xs p-2" style={{ background: '#0a0a0f' }}>
