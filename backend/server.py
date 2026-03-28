@@ -30,6 +30,7 @@ from api_carto import (
 from france_infra_data import get_all_france_infra
 from s3renr_data import S3RENR_DATA, get_s3renr_top_opportunities
 from dc_search_api import dc_search, dc_get_site
+from gpt_agent_config import get_openapi_schema, COCKPIT_IMMO_GPT_SYSTEM_PROMPT
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -727,6 +728,55 @@ async def get_dc_site_detail(site_id: str):
         raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
     return site
 
+
+
+# ═══════════════════════════════════════════════════════════
+# GPT AGENT CONFIGURATION ENDPOINTS
+# ═══════════════════════════════════════════════════════════
+
+@api_router.get("/gpt/openapi-schema")
+async def get_gpt_openapi_schema(request: Request):
+    """Returns the OpenAPI 3.1.0 schema for ChatGPT Custom GPT Actions"""
+    # Use X-Forwarded headers for proper external URL behind proxy
+    forwarded_proto = request.headers.get("x-forwarded-proto", "https")
+    forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+    if forwarded_host:
+        server_url = f"{forwarded_proto}://{forwarded_host}"
+    else:
+        server_url = str(request.base_url).rstrip("/")
+    return get_openapi_schema(server_url)
+
+
+@api_router.get("/gpt/system-prompt")
+async def get_gpt_system_prompt():
+    """Returns the system prompt for the custom GPT"""
+    return {"system_prompt": COCKPIT_IMMO_GPT_SYSTEM_PROMPT}
+
+
+@api_router.get("/gpt/config")
+async def get_gpt_config(request: Request):
+    """Returns full GPT configuration (schema + prompt + instructions)"""
+    forwarded_proto = request.headers.get("x-forwarded-proto", "https")
+    forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+    if forwarded_host:
+        server_url = f"{forwarded_proto}://{forwarded_host}"
+    else:
+        server_url = str(request.base_url).rstrip("/")
+    return {
+        "name": "Cockpit Immo — Expert DC France",
+        "description": "Expert en prospection foncière pour data centers en France. Interroge les capacités électriques S3REnR, les données cadastrales IGN, et les zones PLU pour identifier les meilleurs terrains.",
+        "system_prompt": COCKPIT_IMMO_GPT_SYSTEM_PROMPT,
+        "openapi_schema_url": f"{server_url}/api/gpt/openapi-schema",
+        "actions_server_url": server_url,
+        "setup_instructions": {
+            "step_1": "Aller sur https://chatgpt.com/gpts/editor",
+            "step_2": "Copier le System Prompt ci-dessous dans le champ 'Instructions'",
+            "step_3": "Aller dans l'onglet 'Configure' > 'Actions' > 'Create new action'",
+            "step_4": f"Dans 'Import from URL', coller: {server_url}/api/gpt/openapi-schema",
+            "step_5": "Authentication: sélectionner 'None' (API publique)",
+            "step_6": "Cliquer 'Save' puis tester avec: 'Trouve-moi un terrain pour un DC de 20MW en PACA'",
+        },
+    }
 
 
 # ═══════════════════════════════════════════════════════════

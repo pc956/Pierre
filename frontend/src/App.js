@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import AuthCallback from "./components/AuthCallback";
 import LoginPage from "./pages/LoginPage";
 import Dashboard from "./pages/Dashboard";
+import GPTAgent from "./pages/GPTAgent";
 
 // Protected Route component
 function ProtectedRoute({ children }) {
@@ -45,6 +46,7 @@ function AppRouter() {
     <Routes>
       <Route path="/" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/gpt-agent" element={<ProtectedRoute><GPTAgent /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
