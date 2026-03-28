@@ -125,6 +125,13 @@ export default function Dashboard() {
   // SIREN modal
   const [sirenModal, setSirenModal] = useState(null);
   
+  // Commune search (API Carto)
+  const [communeSearch, setCommuneSearch] = useState('');
+  const [communeResults, setCommuneResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [franceParcels, setFranceParcels] = useState([]);
+  const [showFranceSearch, setShowFranceSearch] = useState(false);
+  
   // Advanced filters
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -149,6 +156,67 @@ export default function Dashboard() {
     { value: 'U', label: 'U - Zone urbaine' },
   ];
 
+  // Search communes in France
+  const searchCommunes = async (query) => {
+    if (query.length < 2) {
+      setCommuneResults([]);
+      return;
+    }
+    setSearchLoading(true);
+    try {
+      const response = await axios.get(`${API}/france/communes?q=${encodeURIComponent(query)}&limit=10`);
+      setCommuneResults(response.data.communes || []);
+    } catch (error) {
+      console.error('Error searching communes:', error);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  // Load parcels for a commune
+  const loadCommuneParcels = async (commune) => {
+    setSearchLoading(true);
+    try {
+      const response = await axios.get(
+        `${API}/france/parcelles/commune/${commune.code}?project_type=${projectType}`
+      );
+      const newParcels = response.data.parcelles || [];
+      setFranceParcels(prev => {
+        // Merge with existing, avoiding duplicates
+        const existing = new Set(prev.map(p => p.parcel_id));
+        const unique = newParcels.filter(p => !existing.has(p.parcel_id));
+        return [...prev, ...unique];
+      });
+      setCommuneSearch('');
+      setCommuneResults([]);
+    } catch (error) {
+      console.error('Error loading commune parcels:', error);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  // Load parcels around a point (poste HTB or landing point)
+  const loadParcelsAroundPoint = async (lon, lat, radius = 2000, name = '') => {
+    setSearchLoading(true);
+    try {
+      const response = await axios.get(
+        `${API}/france/parcelles/around?lon=${lon}&lat=${lat}&radius_m=${radius}&project_type=${projectType}`
+      );
+      const newParcels = response.data.parcelles || [];
+      setFranceParcels(prev => {
+        const existing = new Set(prev.map(p => p.parcel_id));
+        const unique = newParcels.filter(p => !existing.has(p.parcel_id));
+        return [...prev, ...unique];
+      });
+      alert(`${newParcels.length} parcelles chargées autour de ${name}`);
+    } catch (error) {
+      console.error('Error loading parcels around point:', error);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
   // Fetch parcels
   useEffect(() => {
     fetchParcels();
@@ -160,8 +228,11 @@ export default function Dashboard() {
     fetchMapLayers();
   }, []);
   
+  // Combine seed parcels with France parcels
+  const allParcels = [...parcels, ...franceParcels];
+  
   // Apply advanced filters client-side
-  const filteredParcels = parcels.filter(p => {
+  const filteredParcels = allParcels.filter(p => {
     // Distance poste HTB
     const distPoste = (p.dist_poste_htb_m || 50000) / 1000;
     if (distPoste > filters.distPosteMax) return false;
@@ -348,6 +419,49 @@ export default function Dashboard() {
           className="h-12 flex items-center gap-4 px-4"
           style={{ background: '#0a0a0f', borderBottom: '1px solid #1f1f2e' }}
         >
+          {/* France Search */}
+          <div className="relative flex items-center gap-2">
+            <Search size={14} style={{ color: '#3b82f6' }} />
+            <input
+              type="text"
+              value={communeSearch}
+              onChange={(e) => {
+                setCommuneSearch(e.target.value);
+                searchCommunes(e.target.value);
+              }}
+              placeholder="Rechercher une commune..."
+              className="h-7 px-2 text-xs"
+              style={{ width: 200 }}
+              data-testid="commune-search"
+            />
+            {searchLoading && <div className="loader" style={{ width: 14, height: 14 }}></div>}
+            
+            {/* Dropdown results */}
+            {communeResults.length > 0 && (
+              <div 
+                className="absolute top-full left-0 mt-1 z-50 w-80"
+                style={{ background: '#12121a', border: '1px solid #1f1f2e' }}
+              >
+                {communeResults.map(commune => (
+                  <button
+                    key={commune.code}
+                    onClick={() => loadCommuneParcels(commune)}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-[#1f1f2e] flex justify-between"
+                    style={{ color: '#e8e8ed' }}
+                  >
+                    <span>
+                      <strong>{commune.nom}</strong>
+                      <span style={{ color: '#8f8f9d' }}> ({commune.departement?.code})</span>
+                    </span>
+                    <span className="font-mono" style={{ color: '#8f8f9d' }}>
+                      {commune.population?.toLocaleString()} hab
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center gap-2">
             <label className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Type projet:</label>
             <select
@@ -417,8 +531,22 @@ export default function Dashboard() {
 
           <div className="ml-auto flex items-center gap-4">
             <span className="text-xs font-mono" style={{ color: '#8f8f9d' }}>
-              {filteredParcels.length}/{parcels.length} sites · {postes.length} postes · {landingPoints.length} landing pts
+              {filteredParcels.length}/{allParcels.length} sites 
+              {franceParcels.length > 0 && (
+                <span style={{ color: '#3b82f6' }}> (+{franceParcels.length} FR)</span>
+              )}
+              · {postes.length} postes · {landingPoints.length} LP
             </span>
+            {franceParcels.length > 0 && (
+              <button
+                onClick={() => setFranceParcels([])}
+                className="text-xs flex items-center gap-1 hover:text-[#ff4757]"
+                style={{ color: '#8f8f9d' }}
+              >
+                <XCircle size={12} />
+                Clear FR
+              </button>
+            )}
           </div>
         </div>
 
@@ -623,6 +751,17 @@ export default function Dashboard() {
                             <p className="text-xs text-gray-400">
                               {poste.tension_kv} kV · {poste.puissance_mva} MVA
                             </p>
+                            <button
+                              onClick={() => loadParcelsAroundPoint(
+                                poste.geometry.coordinates[0],
+                                poste.geometry.coordinates[1],
+                                5000,
+                                poste.nom
+                              )}
+                              className="mt-2 w-full text-xs px-2 py-1 bg-[#ffa502] text-[#0a0a0f] font-mono uppercase"
+                            >
+                              Parcelles à 5km
+                            </button>
                           </div>
                         </Popup>
                       </Marker>
@@ -644,6 +783,17 @@ export default function Dashboard() {
                             {lp.cables_noms && (
                               <p className="text-xs mt-1">{lp.cables_noms.slice(0,3).join(', ')}</p>
                             )}
+                            <button
+                              onClick={() => loadParcelsAroundPoint(
+                                lp.geometry.coordinates[0],
+                                lp.geometry.coordinates[1],
+                                10000,
+                                lp.nom
+                              )}
+                              className="mt-2 w-full text-xs px-2 py-1 bg-[#00d4aa] text-[#0a0a0f] font-mono uppercase"
+                            >
+                              Parcelles à 10km
+                            </button>
                           </div>
                         </Popup>
                       </Marker>

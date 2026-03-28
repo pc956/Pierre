@@ -22,6 +22,10 @@ from models import (
 )
 from scoring import compute_full_score
 from seed_data import get_seed_data
+from api_carto import (
+    search_communes, get_parcelles_by_commune, get_parcelles_by_bbox,
+    get_parcelles_around_point, get_sections_by_commune, parse_parcelle_feature
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -526,6 +530,143 @@ async def get_map_electrical_assets(asset_type: Optional[str] = None):
         query["type"] = asset_type
     assets = await db.electrical_assets.find(query, {"_id": 0}).to_list(200)
     return {"electrical_assets": assets}
+
+
+# ═══════════════════════════════════════════════════════════
+# API CARTO ENDPOINTS (French Cadastre - All France)
+# ═══════════════════════════════════════════════════════════
+
+@api_router.get("/france/communes")
+async def search_french_communes(q: str, limit: int = 20):
+    """Search French communes by name"""
+    if len(q) < 2:
+        return {"communes": []}
+    
+    communes = await search_communes(q, limit)
+    return {"communes": communes}
+
+
+@api_router.get("/france/parcelles/commune/{code_insee}")
+async def get_commune_parcelles(code_insee: str, section: Optional[str] = None, project_type: str = "colocation_t3"):
+    """
+    Get all parcelles for a French commune from API Carto
+    Warning: Large communes can return thousands of parcels
+    """
+    data = await get_parcelles_by_commune(code_insee, section)
+    
+    # Parse features and compute scores
+    parcelles = []
+    for feature in data.get("features", [])[:500]:  # Limit to 500
+        parsed = parse_parcelle_feature(feature)
+        
+        # Only include parcels > 0.5 ha for DC relevance
+        if parsed["surface_ha"] >= 0.5:
+            # Add placeholder infrastructure data for scoring
+            parsed["dist_poste_htb_m"] = 10000  # Default estimate
+            parsed["dist_poste_hta_m"] = 3000
+            parsed["dist_backbone_fibre_m"] = 2000
+            parsed["nb_operateurs_fibre"] = 2
+            parsed["plu_zone"] = "U"  # Unknown, default to urban
+            parsed["zone_saturation"] = "inconnu"
+            
+            # Compute score
+            try:
+                score_data = compute_full_score(parsed, project_type)
+                parsed["score"] = {
+                    "score_net": score_data.get("score_net", 0),
+                    "verdict": score_data.get("verdict", "CONDITIONNEL"),
+                    "power_mw_p50": score_data.get("power_mw_p50", 0),
+                }
+            except Exception as e:
+                parsed["score"] = {"score_net": 0, "verdict": "CONDITIONNEL"}
+            
+            parcelles.append(parsed)
+    
+    return {
+        "parcelles": parcelles,
+        "count": len(parcelles),
+        "total_raw": len(data.get("features", [])),
+        "source": "api_carto_ign"
+    }
+
+
+@api_router.get("/france/parcelles/bbox")
+async def get_bbox_parcelles(
+    min_lon: float, 
+    min_lat: float, 
+    max_lon: float, 
+    max_lat: float,
+    project_type: str = "colocation_t3",
+    limit: int = 200
+):
+    """
+    Get parcelles within a bounding box from API Carto
+    Use for map viewport queries
+    """
+    data = await get_parcelles_by_bbox(min_lon, min_lat, max_lon, max_lat, limit)
+    
+    parcelles = []
+    for feature in data.get("features", [])[:limit]:
+        parsed = parse_parcelle_feature(feature)
+        
+        if parsed["surface_ha"] >= 0.3:
+            # Add default infrastructure data
+            parsed["dist_poste_htb_m"] = 10000
+            parsed["dist_backbone_fibre_m"] = 2000
+            parsed["plu_zone"] = "U"
+            
+            parcelles.append(parsed)
+    
+    return {
+        "parcelles": parcelles,
+        "count": len(parcelles),
+        "source": "api_carto_ign"
+    }
+
+
+@api_router.get("/france/parcelles/around")
+async def get_parcelles_around(
+    lon: float,
+    lat: float,
+    radius_m: float = 2000,
+    project_type: str = "colocation_t3"
+):
+    """
+    Get parcelles around a point (e.g., around a poste HTB or landing point)
+    """
+    data = await get_parcelles_around_point(lon, lat, radius_m, limit=100)
+    
+    parcelles = []
+    for feature in data.get("features", []):
+        parsed = parse_parcelle_feature(feature)
+        
+        if parsed["surface_ha"] >= 0.3:
+            parcelles.append(parsed)
+    
+    return {
+        "parcelles": parcelles,
+        "count": len(parcelles),
+        "center": {"lon": lon, "lat": lat},
+        "radius_m": radius_m,
+        "source": "api_carto_ign"
+    }
+
+
+@api_router.get("/france/sections/{code_insee}")
+async def get_commune_sections(code_insee: str):
+    """Get cadastral sections for a commune"""
+    sections = await get_sections_by_commune(code_insee)
+    
+    return {
+        "sections": [
+            {
+                "section": s.get("properties", {}).get("section", ""),
+                "feuille": s.get("properties", {}).get("feuille", ""),
+            }
+            for s in sections
+        ],
+        "count": len(sections)
+    }
 
 
 # ═══════════════════════════════════════════════════════════
