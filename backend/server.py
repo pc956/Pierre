@@ -24,7 +24,8 @@ from scoring import compute_full_score
 from seed_data import get_seed_data
 from api_carto import (
     search_communes, get_parcelles_by_commune, get_parcelles_by_bbox,
-    get_parcelles_around_point, get_sections_by_commune, parse_parcelle_feature
+    get_parcelles_around_point, get_sections_by_commune, parse_parcelle_feature,
+    get_gpu_zone_urba_for_point, get_gpu_zones_for_bbox
 )
 from france_infra_data import get_all_france_infra
 from s3renr_data import S3RENR_DATA, get_s3renr_top_opportunities
@@ -764,18 +765,42 @@ async def get_bbox_parcelles(
 ):
     """
     Get parcelles within a bounding box from API Carto
-    Use for map viewport queries
+    Also fetches PLU zones from GPU API
     """
     import math
+    import asyncio
     
-    data = await get_parcelles_by_bbox(min_lon, min_lat, max_lon, max_lat, limit)
+    # Fetch parcels and GPU zones in parallel
+    parcels_task = get_parcelles_by_bbox(min_lon, min_lat, max_lon, max_lat, limit)
+    gpu_task = get_gpu_zones_for_bbox(min_lon, min_lat, max_lon, max_lat)
+    
+    data, gpu_zones = await asyncio.gather(parcels_task, gpu_task)
+    
+    # Build a simple lookup: for each GPU zone, store its typezone/libelle and centroid
+    # We'll assign each parcel the PLU of the nearest GPU zone (or containing zone)
+    gpu_zone_list = []
+    for gz in gpu_zones[:500]:  # Limit zones processed
+        gz_props = gz.get("properties", {})
+        gz_geom = gz.get("geometry", {})
+        gz_type = gz_props.get("typezone", "")
+        gz_libelle = gz_props.get("libelle", "")
+        gz_libelong = gz_props.get("libelong", "")
+        # Compute centroid of GPU zone for proximity matching
+        gz_centroid = _get_geom_centroid(gz_geom)
+        if gz_centroid:
+            gpu_zone_list.append({
+                "typezone": gz_type,
+                "libelle": gz_libelle,
+                "libelong": gz_libelong,
+                "lon": gz_centroid[0],
+                "lat": gz_centroid[1],
+            })
     
     parcelles = []
     for feature in data.get("features", [])[:limit]:
         parsed = parse_parcelle_feature(feature)
         
         if parsed.get("centroid"):
-            # Compute real distances to nearest infrastructure
             plat = parsed["latitude"]
             plon = parsed["longitude"]
             
@@ -806,9 +831,26 @@ async def get_bbox_parcelles(
             parsed["dist_landing_point_km"] = round(min_dist_lp / 1000, 1)
             parsed["landing_point_nom"] = nearest_lp_name
             parsed["landing_point_nb_cables"] = nearest_lp_cables
-            parsed["dist_backbone_fibre_m"] = 2000  # Default
+            parsed["dist_backbone_fibre_m"] = 2000
             parsed["nb_operateurs_fibre"] = 2
-            parsed["plu_zone"] = "U"  # Default
+            
+            # Assign PLU zone from GPU data (nearest zone)
+            plu_zone = "inconnu"
+            plu_libelle = ""
+            plu_libelong = ""
+            if gpu_zone_list:
+                min_dist_plu = 999999
+                for gz in gpu_zone_list:
+                    d = math.sqrt((plon - gz["lon"])**2 + (plat - gz["lat"])**2)
+                    if d < min_dist_plu:
+                        min_dist_plu = d
+                        plu_zone = gz["typezone"] or "inconnu"
+                        plu_libelle = gz["libelle"]
+                        plu_libelong = gz["libelong"]
+            
+            parsed["plu_zone"] = plu_zone
+            parsed["plu_libelle"] = plu_libelle
+            parsed["plu_libelong"] = plu_libelong
             parsed["zone_saturation"] = "inconnu"
             
             # Compute score
@@ -831,8 +873,26 @@ async def get_bbox_parcelles(
     return {
         "parcelles": parcelles,
         "count": len(parcelles),
-        "source": "api_carto_ign"
+        "source": "api_carto_ign",
+        "gpu_zones_count": len(gpu_zone_list),
     }
+
+
+def _get_geom_centroid(geom):
+    """Get centroid [lon, lat] from a GeoJSON geometry"""
+    if not geom:
+        return None
+    coords = geom.get("coordinates", [])
+    try:
+        if geom["type"] == "Polygon" and coords and coords[0]:
+            pts = coords[0]
+            return [sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)]
+        elif geom["type"] == "MultiPolygon" and coords and coords[0] and coords[0][0]:
+            pts = coords[0][0]
+            return [sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts)]
+    except (IndexError, TypeError, ZeroDivisionError):
+        pass
+    return None
 
 
 def _haversine(lon1, lat1, lon2, lat2):

@@ -102,6 +102,63 @@ async def get_parcelles_by_bbox(
         return {"type": "FeatureCollection", "features": []}
 
 
+async def get_gpu_zone_urba_for_point(lon: float, lat: float) -> Optional[Dict[str, Any]]:
+    """
+    Get PLU zone from Géoportail de l'Urbanisme (GPU) for a point
+    Returns zone info: typezone (U, AU, A, N), libelle, libelong
+    """
+    geom = {"type": "Point", "coordinates": [lon, lat]}
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(
+                "https://apicarto.ign.fr/api/gpu/zone-urba",
+                params={"geom": str(geom).replace("'", '"')}
+            )
+            if response.status_code == 200:
+                data = response.json()
+                features = data.get("features", [])
+                if features:
+                    props = features[0].get("properties", {})
+                    return {
+                        "typezone": props.get("typezone", ""),
+                        "libelle": props.get("libelle", ""),
+                        "libelong": props.get("libelong", ""),
+                        "destdomi": props.get("destdomi", ""),
+                    }
+    except Exception:
+        pass
+    return None
+
+
+async def get_gpu_zones_for_bbox(min_lon: float, min_lat: float, max_lon: float, max_lat: float) -> List[Dict[str, Any]]:
+    """
+    Get all PLU zones within a bounding box from GPU
+    Returns list of zone features with geometry and properties
+    """
+    bbox_geojson = {
+        "type": "Polygon",
+        "coordinates": [[
+            [min_lon, min_lat],
+            [max_lon, min_lat],
+            [max_lon, max_lat],
+            [min_lon, max_lat],
+            [min_lon, min_lat]
+        ]]
+    }
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(
+                "https://apicarto.ign.fr/api/gpu/zone-urba",
+                params={"geom": str(bbox_geojson).replace("'", '"')}
+            )
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("features", [])
+    except Exception:
+        pass
+    return []
+
+
 async def get_parcelles_around_point(
     lon: float, 
     lat: float, 

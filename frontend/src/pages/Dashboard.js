@@ -4,9 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { 
   Server, Map as MapIcon, Table, Briefcase, Bell, Settings, LogOut, 
-  Search, Filter, ChevronDown, Plus, Zap, Wifi, Droplets, Square,
+  Search, Filter, ChevronDown, ChevronUp, Plus, Zap, Wifi, Droplets, Square,
   TrendingUp, Clock, AlertTriangle, CheckCircle, XCircle, RefreshCw,
-  Layers, Eye, EyeOff, Anchor, Cable, Building2, ExternalLink, X, Loader
+  Layers, Eye, EyeOff, Anchor, Cable, Building2, ExternalLink, X, Loader, Menu
 } from 'lucide-react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents, Marker, Polyline, Polygon as LeafletPolygon } from 'react-leaflet';
 import L from 'leaflet';
@@ -156,6 +156,11 @@ export default function Dashboard() {
   const [selectedParcel, setSelectedParcel] = useState(null);
   const [projectType, setProjectType] = useState('colocation_t3');
   const [scoreMin, setScoreMin] = useState(0);
+  
+  // Mobile state
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [mobilePanel, setMobilePanel] = useState(null); // 'filters' | 'layers' | 'detail' | null
+  const [mobileSidebar, setMobileSidebar] = useState(false);
   
   // Map layers data
   const [landingPoints, setLandingPoints] = useState([]);
@@ -313,6 +318,20 @@ export default function Dashboard() {
     fetchMapLayers();
   }, []);
   
+  // Responsive resize listener
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Close mobile panel when selecting a parcel
+  useEffect(() => {
+    if (selectedParcel && isMobile) {
+      setMobilePanel('detail');
+    }
+  }, [selectedParcel, isMobile]);
+  
   // France parcels only (no more seed parcels)
   const allParcels = franceParcels;
   
@@ -386,81 +405,79 @@ export default function Dashboard() {
 
   return (
     <div className="h-screen flex flex-col" style={{ background: '#0a0a0f' }}>
-      {/* Desktop warning for mobile */}
-      <div 
-        className="desktop-warning hidden fixed inset-0 z-50 items-center justify-center p-8"
-        style={{ background: '#0a0a0f' }}
-      >
-        <div className="text-center">
-          <Server size={48} className="mx-auto mb-4" style={{ color: '#00d4aa' }} />
-          <h2 className="text-xl font-bold mb-2" style={{ color: '#e8e8ed' }}>
-            Application Desktop
-          </h2>
-          <p className="text-sm" style={{ color: '#8f8f9d' }}>
-            Cockpit Immo est optimisé pour les écrans de 1280px minimum.
-            Veuillez utiliser un ordinateur pour accéder à cette application.
-          </p>
-        </div>
-      </div>
-
       {/* Main content */}
       <div className="main-content flex flex-col h-full">
         {/* Top bar */}
         <header 
-          className="h-12 flex items-center justify-between px-4"
+          className="h-12 flex items-center justify-between px-3 md:px-4 shrink-0"
           style={{ background: '#12121a', borderBottom: '1px solid #1f1f2e' }}
         >
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <div className="flex items-center gap-2">
-              <Server size={20} style={{ color: '#00d4aa' }} />
-              <span className="font-bold" style={{ color: '#e8e8ed' }}>COCKPIT IMMO</span>
+              <Server size={isMobile ? 16 : 20} style={{ color: '#00d4aa' }} />
+              <span className="font-bold text-sm md:text-base" style={{ color: '#e8e8ed' }}>COCKPIT IMMO</span>
             </div>
             
-            {/* Navigation */}
-            <nav className="flex items-center gap-1 ml-8">
-              <button
-                onClick={() => setActiveView('map')}
-                className={`h-8 px-3 flex items-center gap-2 text-xs font-mono uppercase transition-colors ${
-                  activeView === 'map' ? 'text-[#00d4aa] border-b-2 border-[#00d4aa]' : 'text-[#8f8f9d] hover:text-[#e8e8ed]'
-                }`}
-                data-testid="nav-map"
-              >
-                <MapIcon size={14} />
-                Carte
-              </button>
-              <button
-                onClick={() => setActiveView('table')}
-                className={`h-8 px-3 flex items-center gap-2 text-xs font-mono uppercase transition-colors ${
-                  activeView === 'table' ? 'text-[#00d4aa] border-b-2 border-[#00d4aa]' : 'text-[#8f8f9d] hover:text-[#e8e8ed]'
-                }`}
-                data-testid="nav-table"
-              >
-                <Table size={14} />
-                Tableau
-              </button>
-              <button
-                onClick={() => setActiveView('crm')}
-                className={`h-8 px-3 flex items-center gap-2 text-xs font-mono uppercase transition-colors ${
-                  activeView === 'crm' ? 'text-[#00d4aa] border-b-2 border-[#00d4aa]' : 'text-[#8f8f9d] hover:text-[#e8e8ed]'
-                }`}
-                data-testid="nav-crm"
-              >
-                <Briefcase size={14} />
-                CRM
-              </button>
-            </nav>
+            {/* Navigation - desktop */}
+            {!isMobile && (
+              <nav className="flex items-center gap-1 ml-8">
+                <button
+                  onClick={() => setActiveView('map')}
+                  className={`h-8 px-3 flex items-center gap-2 text-xs font-mono uppercase transition-colors ${
+                    activeView === 'map' ? 'text-[#00d4aa] border-b-2 border-[#00d4aa]' : 'text-[#8f8f9d] hover:text-[#e8e8ed]'
+                  }`}
+                  data-testid="nav-map"
+                >
+                  <MapIcon size={14} />
+                  Carte
+                </button>
+                <button
+                  onClick={() => setActiveView('table')}
+                  className={`h-8 px-3 flex items-center gap-2 text-xs font-mono uppercase transition-colors ${
+                    activeView === 'table' ? 'text-[#00d4aa] border-b-2 border-[#00d4aa]' : 'text-[#8f8f9d] hover:text-[#e8e8ed]'
+                  }`}
+                  data-testid="nav-table"
+                >
+                  <Table size={14} />
+                  Tableau
+                </button>
+                <button
+                  onClick={() => setActiveView('crm')}
+                  className={`h-8 px-3 flex items-center gap-2 text-xs font-mono uppercase transition-colors ${
+                    activeView === 'crm' ? 'text-[#00d4aa] border-b-2 border-[#00d4aa]' : 'text-[#8f8f9d] hover:text-[#e8e8ed]'
+                  }`}
+                  data-testid="nav-crm"
+                >
+                  <Briefcase size={14} />
+                  CRM
+                </button>
+              </nav>
+            )}
           </div>
 
-          <div className="flex items-center gap-4">
-            <button className="h-8 w-8 flex items-center justify-center text-[#8f8f9d] hover:text-[#e8e8ed]">
-              <Bell size={16} />
-            </button>
-            <div className="flex items-center gap-2">
-              {user?.picture && (
-                <img src={user.picture} alt="" className="w-6 h-6 rounded-full" />
-              )}
-              <span className="text-xs" style={{ color: '#8f8f9d' }}>{user?.name}</span>
-            </div>
+          <div className="flex items-center gap-2 md:gap-4">
+            {isMobile && (
+              <button 
+                onClick={() => setMobileSidebar(!mobileSidebar)}
+                className="h-8 w-8 flex items-center justify-center text-[#8f8f9d]"
+                data-testid="mobile-menu-btn"
+              >
+                <Menu size={18} />
+              </button>
+            )}
+            {!isMobile && (
+              <>
+                <button className="h-8 w-8 flex items-center justify-center text-[#8f8f9d] hover:text-[#e8e8ed]">
+                  <Bell size={16} />
+                </button>
+                <div className="flex items-center gap-2">
+                  {user?.picture && (
+                    <img src={user.picture} alt="" className="w-6 h-6 rounded-full" />
+                  )}
+                  <span className="text-xs" style={{ color: '#8f8f9d' }}>{user?.name}</span>
+                </div>
+              </>
+            )}
             <button 
               onClick={logout}
               className="h-8 w-8 flex items-center justify-center text-[#8f8f9d] hover:text-[#ff4757]"
@@ -471,11 +488,12 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Filters bar */}
-        <div 
-          className="h-12 flex items-center gap-4 px-4"
-          style={{ background: '#0a0a0f', borderBottom: '1px solid #1f1f2e' }}
-        >
+        {/* Filters bar - desktop: inline, mobile: hidden behind button */}
+        {!isMobile && (
+          <div 
+            className="h-12 flex items-center gap-4 px-4 shrink-0"
+            style={{ background: '#0a0a0f', borderBottom: '1px solid #1f1f2e' }}
+          >
           {/* France Search */}
           <div className="relative flex items-center gap-2">
             <Search size={14} style={{ color: '#3b82f6' }} />
@@ -588,13 +606,99 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+        )}
 
-        {/* Advanced Filters Panel */}
-        {showAdvancedFilters && (
+        {/* Mobile top controls */}
+        {isMobile && (
           <div 
-            className="px-4 py-3 flex flex-wrap items-center gap-6"
-            style={{ background: '#12121a', borderBottom: '1px solid #1f1f2e' }}
+            className="flex items-center gap-2 px-3 py-2 shrink-0"
+            style={{ background: '#0a0a0f', borderBottom: '1px solid #1f1f2e' }}
           >
+            {/* Search */}
+            <div className="relative flex-1 flex items-center gap-1">
+              <Search size={12} style={{ color: '#3b82f6' }} />
+              <input
+                type="text"
+                value={communeSearch}
+                onChange={(e) => {
+                  setCommuneSearch(e.target.value);
+                  searchCommunes(e.target.value);
+                }}
+                placeholder="Commune..."
+                className="h-7 px-2 text-xs flex-1"
+                data-testid="commune-search-mobile"
+              />
+              {searchLoading && <div className="loader" style={{ width: 12, height: 12 }}></div>}
+              {communeResults.length > 0 && (
+                <div 
+                  className="absolute top-full left-0 mt-1 z-50 w-full"
+                  style={{ background: '#12121a', border: '1px solid #1f1f2e' }}
+                >
+                  {communeResults.map(commune => (
+                    <button
+                      key={commune.code}
+                      onClick={() => loadCommuneParcels(commune)}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-[#1f1f2e]"
+                      style={{ color: '#e8e8ed' }}
+                    >
+                      <strong>{commune.nom}</strong>
+                      <span style={{ color: '#8f8f9d' }}> ({commune.departement?.code})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Mobile action buttons */}
+            <button
+              onClick={() => setMobilePanel(mobilePanel === 'filters' ? null : 'filters')}
+              className={`h-8 w-8 flex items-center justify-center rounded ${mobilePanel === 'filters' ? 'bg-[#00d4aa22] text-[#00d4aa]' : 'text-[#8f8f9d]'}`}
+              data-testid="mobile-filters-btn"
+            >
+              <Filter size={16} />
+            </button>
+            <button
+              onClick={() => setMobilePanel(mobilePanel === 'layers' ? null : 'layers')}
+              className={`h-8 w-8 flex items-center justify-center rounded ${mobilePanel === 'layers' ? 'bg-[#00d4aa22] text-[#00d4aa]' : 'text-[#8f8f9d]'}`}
+              data-testid="mobile-layers-btn"
+            >
+              <Layers size={16} />
+            </button>
+            
+            {/* Status */}
+            <span className="text-[10px] font-mono whitespace-nowrap" style={{ color: '#8f8f9d' }}>
+              {filteredParcels.length}
+              {bboxLoading && <Loader size={10} className="inline ml-1 animate-spin" />}
+            </span>
+          </div>
+        )}
+        {(showAdvancedFilters || (isMobile && mobilePanel === 'filters')) && (
+          <div 
+            className={`px-3 md:px-4 py-3 flex flex-wrap items-center gap-3 md:gap-6 shrink-0 ${isMobile ? 'fixed bottom-0 left-0 right-0 z-40 flex-col items-stretch' : ''}`}
+            style={{ background: '#12121a', borderTop: isMobile ? '1px solid #1f1f2e' : 'none', borderBottom: isMobile ? 'none' : '1px solid #1f1f2e', maxHeight: isMobile ? '60vh' : 'auto', overflowY: isMobile ? 'auto' : 'visible' }}
+          >
+            {isMobile && (
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-mono uppercase" style={{ color: '#00d4aa' }}>Filtres avancés</span>
+                <button onClick={() => setMobilePanel(null)} className="text-[#8f8f9d]"><X size={16} /></button>
+              </div>
+            )}
+            {/* Type projet (mobile only - desktop has it in filter bar) */}
+            {isMobile && (
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Type projet:</label>
+                <select
+                  value={projectType}
+                  onChange={(e) => setProjectType(e.target.value)}
+                  className="h-7 px-2 text-xs flex-1"
+                  data-testid="project-type-select-mobile"
+                >
+                  {PROJECT_TYPES.map(pt => (
+                    <option key={pt.value} value={pt.value}>{pt.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {/* Distance Poste HTB */}
             <div className="flex items-center gap-2">
               <Zap size={14} style={{ color: '#ffa502' }} />
@@ -701,10 +805,10 @@ export default function Dashboard() {
         )}
 
         {/* Main content area */}
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden relative">
           {activeView === 'map' && (
             <>
-              {/* Map */}
+              {/* Map - full width on mobile */}
               <div className="flex-1 relative">
                 <MapContainer
                   center={[46.5, 2.5]}
@@ -986,11 +1090,11 @@ export default function Dashboard() {
                 {/* Zoom indicator overlay */}
                 {mapZoom < MIN_ZOOM_FOR_PARCELS && (
                   <div 
-                    className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000] px-4 py-2 text-xs font-mono"
-                    style={{ background: 'rgba(18,18,26,0.9)', border: '1px solid #1f1f2e', color: '#ffa502' }}
+                    className={`absolute left-1/2 -translate-x-1/2 z-[1000] px-3 py-1.5 text-xs font-mono ${isMobile ? 'bottom-16' : 'bottom-4'}`}
+                    style={{ background: 'rgba(18,18,26,0.9)', border: '1px solid #1f1f2e', color: '#ffa502', maxWidth: isMobile ? '90%' : 'auto', textAlign: 'center' }}
                     data-testid="zoom-indicator"
                   >
-                    Zoomez au niveau 14+ pour afficher les parcelles cadastrales · Zoom actuel: {mapZoom}
+                    Zoom 14+ pour parcelles · z{mapZoom}
                   </div>
                 )}
                 
@@ -1005,7 +1109,8 @@ export default function Dashboard() {
                   </div>
                 )}
                 
-                {/* Layer control */}
+                {/* Layer control - desktop only (mobile uses bottom sheet) */}
+                {!isMobile && (
                 <div 
                   className="absolute top-4 right-4 z-[1000]"
                   style={{ minWidth: 200 }}
@@ -1079,13 +1184,30 @@ export default function Dashboard() {
                     </div>
                   )}
                 </div>
+                )}
               </div>
 
-              {/* Side panel */}
+              {/* Side panel - desktop: right sidebar, mobile: bottom sheet */}
+              {(!isMobile || mobileSidebar || selectedParcel) && (
               <div 
-                className="w-96 flex flex-col"
-                style={{ background: '#12121a', borderLeft: '1px solid #1f1f2e' }}
+                className={isMobile 
+                  ? "fixed bottom-0 left-0 right-0 z-30 flex flex-col" 
+                  : "w-96 flex flex-col"
+                }
+                style={{ 
+                  background: '#12121a', 
+                  borderLeft: isMobile ? 'none' : '1px solid #1f1f2e',
+                  borderTop: isMobile ? '1px solid #1f1f2e' : 'none',
+                  maxHeight: isMobile ? '55vh' : '100%',
+                  borderRadius: isMobile ? '12px 12px 0 0' : 0,
+                }}
               >
+                {/* Mobile drag handle */}
+                {isMobile && (
+                  <div className="flex justify-center py-2" onClick={() => { setMobileSidebar(false); setSelectedParcel(null); }}>
+                    <div style={{ width: 36, height: 4, borderRadius: 2, background: '#3f3f5f' }} />
+                  </div>
+                )}
                 {selectedParcel ? (
                   <ParcelDetail 
                     parcel={selectedParcel} 
@@ -1199,6 +1321,7 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
+              )}
             </>
           )}
 
@@ -1216,6 +1339,69 @@ export default function Dashboard() {
         </div>
       </div>
       
+      {/* Mobile Layers Overlay */}
+      {isMobile && mobilePanel === 'layers' && (
+        <div 
+          className="fixed bottom-0 left-0 right-0 z-40 p-3"
+          style={{ background: '#12121a', borderTop: '1px solid #1f1f2e', borderRadius: '12px 12px 0 0' }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-mono uppercase" style={{ color: '#00d4aa' }}>Couches</span>
+            <button onClick={() => setMobilePanel(null)} className="text-[#8f8f9d]"><X size={16} /></button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <LayerToggle label="Parcelles" color="#00d4aa" active={layers.parcels} onClick={() => toggleLayer('parcels')} />
+            <LayerToggle label="Postes HTB" color="#ffa502" icon="◆" active={layers.postes_htb} onClick={() => toggleLayer('postes_htb')} />
+            <LayerToggle label="Lignes 400kV" color="#ff4757" icon="─" active={layers.lignes_400kv} onClick={() => toggleLayer('lignes_400kv')} />
+            <LayerToggle label="Lignes 225kV" color="#ffa502" icon="─" active={layers.lignes_225kv} onClick={() => toggleLayer('lignes_225kv')} />
+            <LayerToggle label="Landing Points" color="#00d4aa" icon="⚓" active={layers.landing_points} onClick={() => toggleLayer('landing_points')} />
+            <LayerToggle label="Câbles sous-marins" color="#00d4aa" icon="〰" active={layers.submarine_cables} onClick={() => toggleLayer('submarine_cables')} />
+            <LayerToggle label="DC existants" color="#8b5cf6" icon="■" active={layers.dc_existants} onClick={() => toggleLayer('dc_existants')} />
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Bottom Navigation */}
+      {isMobile && !mobilePanel && !selectedParcel && (
+        <div 
+          className="fixed left-0 right-0 z-[1001] flex items-center justify-around py-2"
+          style={{ background: '#12121a', borderTop: '1px solid #1f1f2e', bottom: 0 }}
+        >
+          <button
+            onClick={() => setActiveView('map')}
+            className={`flex flex-col items-center gap-0.5 px-4 py-1 ${activeView === 'map' ? 'text-[#00d4aa]' : 'text-[#8f8f9d]'}`}
+            data-testid="mobile-nav-map"
+          >
+            <MapIcon size={18} />
+            <span className="text-[10px] font-mono">Carte</span>
+          </button>
+          <button
+            onClick={() => setActiveView('table')}
+            className={`flex flex-col items-center gap-0.5 px-4 py-1 ${activeView === 'table' ? 'text-[#00d4aa]' : 'text-[#8f8f9d]'}`}
+            data-testid="mobile-nav-table"
+          >
+            <Table size={18} />
+            <span className="text-[10px] font-mono">Tableau</span>
+          </button>
+          <button
+            onClick={() => setActiveView('crm')}
+            className={`flex flex-col items-center gap-0.5 px-4 py-1 ${activeView === 'crm' ? 'text-[#00d4aa]' : 'text-[#8f8f9d]'}`}
+            data-testid="mobile-nav-crm"
+          >
+            <Briefcase size={18} />
+            <span className="text-[10px] font-mono">CRM</span>
+          </button>
+          <button
+            onClick={() => setMobileSidebar(!mobileSidebar)}
+            className={`flex flex-col items-center gap-0.5 px-4 py-1 ${mobileSidebar ? 'text-[#00d4aa]' : 'text-[#8f8f9d]'}`}
+            data-testid="mobile-nav-info"
+          >
+            <TrendingUp size={18} />
+            <span className="text-[10px] font-mono">Stats</span>
+          </button>
+        </div>
+      )}
+
       {/* SIREN Modal */}
       {sirenModal && sirenModal.proprietaire_siren && (
         <SirenModal 
@@ -1572,8 +1758,20 @@ function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
         <div className="panel p-3">
           <p className="text-xs font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>Urbanisme</p>
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-sm font-mono" style={{ color: '#e8e8ed' }}>
-              Zone PLU: {parcel.plu_zone || 'N/A'}
+            <span className="text-sm font-bold font-mono px-2 py-0.5 rounded" style={{ 
+              color: parcel.plu_zone === 'U' ? '#2ed573' 
+                   : parcel.plu_zone === 'AU' ? '#ffa502' 
+                   : parcel.plu_zone === 'A' ? '#8b5cf6'
+                   : parcel.plu_zone === 'N' ? '#3b82f6' 
+                   : '#8f8f9d',
+              background: parcel.plu_zone === 'U' ? '#2ed57315' 
+                        : parcel.plu_zone === 'AU' ? '#ffa50215' 
+                        : parcel.plu_zone === 'A' ? '#8b5cf615'
+                        : parcel.plu_zone === 'N' ? '#3b82f615' 
+                        : '#8f8f9d15',
+            }}>
+              PLU: {parcel.plu_zone || 'inconnu'}
+              {parcel.plu_libelle ? ` (${parcel.plu_libelle})` : ''}
             </span>
             <span className={`badge ${
               score.urba_compatibilite === 'compatible' ? 'badge-success' :
@@ -1582,6 +1780,9 @@ function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
               {score.urba_compatibilite?.replace(/_/g, ' ')}
             </span>
           </div>
+          {parcel.plu_libelong && (
+            <p className="text-xs mb-2" style={{ color: '#8f8f9d' }}>{parcel.plu_libelong}</p>
+          )}
           <div className="flex items-center justify-between text-xs">
             <span style={{ color: '#8f8f9d' }}>Deal Friction Index</span>
             <span className="font-mono" style={{ color: score.urba_deal_friction_index < 30 ? '#00d4aa' : '#ffa502' }}>
@@ -1689,18 +1890,19 @@ function ParcelsTable({ parcels, projectType, onSelect }) {
         </span>
       </div>
       <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-        <table className="data-table">
+        <table className="data-table text-xs md:text-sm">
           <thead>
             <tr>
               <th>Commune</th>
-              <th>Région</th>
+              <th className="hidden md:table-cell">Région</th>
               <th>Verdict</th>
               <th>Score</th>
-              <th>MW P50</th>
-              <th>TTM</th>
-              <th>DFI</th>
-              <th>IRR Lev</th>
-              <th>CAPEX</th>
+              <th>PLU</th>
+              <th className="hidden md:table-cell">MW P50</th>
+              <th className="hidden md:table-cell">TTM</th>
+              <th className="hidden lg:table-cell">DFI</th>
+              <th className="hidden lg:table-cell">IRR Lev</th>
+              <th className="hidden lg:table-cell">CAPEX</th>
             </tr>
           </thead>
           <tbody>
@@ -1713,20 +1915,31 @@ function ParcelsTable({ parcels, projectType, onSelect }) {
                   className="cursor-pointer"
                 >
                   <td style={{ color: '#e8e8ed' }}>{parcel.commune}</td>
-                  <td style={{ color: '#8f8f9d' }}>{parcel.region}</td>
+                  <td className="hidden md:table-cell" style={{ color: '#8f8f9d' }}>{parcel.region}</td>
                   <td><VerdictBadge verdict={score.verdict} /></td>
                   <td style={{ color: getScoreColor(score.score_net || 0) }}>
                     {(score.score_net || 0).toFixed(0)}
                   </td>
-                  <td style={{ color: '#00d4aa' }}>{score.power_mw_p50?.toFixed(1) || '-'}</td>
-                  <td style={{ color: '#3b82f6' }}>
+                  <td>
+                    <span className="font-mono" style={{ 
+                      color: parcel.plu_zone === 'U' ? '#2ed573' 
+                           : parcel.plu_zone === 'AU' ? '#ffa502' 
+                           : parcel.plu_zone === 'A' ? '#8b5cf6'
+                           : parcel.plu_zone === 'N' ? '#3b82f6' 
+                           : '#8f8f9d' 
+                    }}>
+                      {parcel.plu_zone || '?'}
+                    </span>
+                  </td>
+                  <td className="hidden md:table-cell" style={{ color: '#00d4aa' }}>{score.power_mw_p50?.toFixed(1) || '-'}</td>
+                  <td className="hidden md:table-cell" style={{ color: '#3b82f6' }}>
                     {score.ttm_min_months || '-'}-{score.ttm_max_months || '-'}
                   </td>
-                  <td style={{ color: (score.urba_deal_friction_index || 0) < 30 ? '#00d4aa' : '#ffa502' }}>
+                  <td className="hidden lg:table-cell" style={{ color: (score.urba_deal_friction_index || 0) < 30 ? '#00d4aa' : '#ffa502' }}>
                     {score.urba_deal_friction_index || 0}
                   </td>
-                  <td style={{ color: '#00d4aa' }}>{score.irr_levered_pct?.toFixed(1) || '-'}%</td>
-                  <td style={{ color: '#e8e8ed' }}>
+                  <td className="hidden lg:table-cell" style={{ color: '#00d4aa' }}>{score.irr_levered_pct?.toFixed(1) || '-'}%</td>
+                  <td className="hidden lg:table-cell" style={{ color: '#e8e8ed' }}>
                     {score.capex_p50 ? `${(score.capex_p50 / 1e6).toFixed(0)}M` : '-'}
                   </td>
                 </tr>

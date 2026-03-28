@@ -269,13 +269,30 @@ input:focus, select:focus, textarea:focus {
   100% { transform: rotate(360deg); }
 }
 
-/* Responsive warning */
-@media (max-width: 1279px) {
-  .desktop-warning {
-    display: flex !important;
+/* Mobile responsive - remove desktop blocker */
+.desktop-warning {
+  display: none !important;
+}
+
+/* Mobile bottom sheet */
+.mobile-bottom-sheet {
+  transition: transform 0.3s ease-out;
+}
+.mobile-bottom-sheet.collapsed {
+  transform: translateY(calc(100% - 48px));
+}
+
+/* Leaflet popup mobile fix */
+@media (max-width: 768px) {
+  .leaflet-popup-content-wrapper {
+    max-width: 280px !important;
   }
-  .main-content {
-    display: none !important;
+  .leaflet-popup-content {
+    margin: 8px !important;
+    font-size: 12px !important;
+  }
+  .leaflet-control-zoom {
+    margin-top: 60px !important;
   }
 }
 
