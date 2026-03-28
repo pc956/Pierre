@@ -11,6 +11,7 @@ import {
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents, Marker, Polyline, Polygon as LeafletPolygon } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import ChatBot from '../components/ChatBot';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -105,6 +106,21 @@ function FlyToParcels({ parcels, trigger }) {
   return null;
 }
 
+function FlyToTarget({ target }) {
+  const map = useMap();
+  const lastTarget = useRef(null);
+  
+  useEffect(() => {
+    if (target && JSON.stringify(target) !== JSON.stringify(lastTarget.current)) {
+      lastTarget.current = target;
+      map.flyTo([target.lat, target.lng], target.zoom || 10, { duration: 1.5 });
+    }
+  }, [target, map]);
+  
+  return null;
+}
+
+
 // Convert MultiPolygon/Polygon GeoJSON to Leaflet positions [[lat, lng], ...]
 function geoJsonToPositions(geometry) {
   if (!geometry || !geometry.coordinates) return [];
@@ -161,6 +177,7 @@ export default function Dashboard() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [mobilePanel, setMobilePanel] = useState(null); // 'filters' | 'layers' | 'detail' | null
   const [mobileSidebar, setMobileSidebar] = useState(false);
+  const [chatFlyTarget, setChatFlyTarget] = useState(null);
   
   // Map layers data
   const [landingPoints, setLandingPoints] = useState([]);
@@ -1085,6 +1102,7 @@ export default function Dashboard() {
                     })}
                     
                     <FlyToParcels parcels={franceParcels} trigger={flyTrigger} />
+                    <FlyToTarget target={chatFlyTarget} />
                   </MapContainer>
                 
                 {/* Zoom indicator overlay */}
@@ -1401,6 +1419,12 @@ export default function Dashboard() {
           </button>
         </div>
       )}
+
+      {/* AI Chat Assistant */}
+      <ChatBot
+        onFlyTo={(lat, lng, zoom) => setChatFlyTarget({ lat, lng, zoom })}
+        onHighlightSites={(ids) => { /* Future: highlight sites on map */ }}
+      />
 
       {/* SIREN Modal */}
       {sirenModal && sirenModal.proprietaire_siren && (

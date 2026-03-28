@@ -31,6 +31,7 @@ from france_infra_data import get_all_france_infra
 from s3renr_data import S3RENR_DATA, get_s3renr_top_opportunities
 from dc_search_api import dc_search, dc_get_site
 from gpt_agent_config import get_openapi_schema, COCKPIT_IMMO_GPT_SYSTEM_PROMPT
+from chat_assistant import process_chat_message
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -728,6 +729,43 @@ async def get_dc_site_detail(site_id: str):
         raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
     return site
 
+
+
+
+# ═══════════════════════════════════════════════════════════
+# AI CHAT ASSISTANT ENDPOINT
+# ═══════════════════════════════════════════════════════════
+
+class ChatMessage(BaseModel):
+    message: str = Field(..., description="User message in natural language")
+    session_id: str = Field(default="default", description="Chat session ID")
+    history: List[Dict[str, str]] = Field(default=[], description="Recent chat history")
+
+
+@api_router.post("/chat")
+async def chat_endpoint(req: ChatMessage):
+    """
+    AI Chat Assistant — processes natural language queries about DC sites.
+    Parses user intent, calls the search API, and returns structured results + map coordinates.
+    """
+    result = await process_chat_message(
+        message=req.message,
+        session_id=req.session_id,
+        history=req.history,
+    )
+    
+    # Log chat for analytics
+    try:
+        db.chat_logs.insert_one({
+            "session_id": req.session_id,
+            "message": req.message,
+            "response_type": result.get("type"),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception:
+        pass
+    
+    return result
 
 
 # ═══════════════════════════════════════════════════════════
