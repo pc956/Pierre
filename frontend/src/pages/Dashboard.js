@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { 
-  Server, Map as MapIcon, Table, Briefcase, Bell, Settings, LogOut, 
+  Server, Map as MapIcon, Table, Bell, Settings, LogOut, 
   Search, Filter, ChevronDown, ChevronUp, Plus, Zap, Wifi, Droplets, Square,
   TrendingUp, Clock, AlertTriangle, CheckCircle, XCircle, RefreshCw,
   Layers, Eye, EyeOff, Anchor, Cable, Building2, ExternalLink, X, Loader, Menu
@@ -458,17 +458,7 @@ export default function Dashboard() {
                   <Table size={14} />
                   Tableau
                 </button>
-                <button
-                  onClick={() => setActiveView('crm')}
-                  className={`h-8 px-3 flex items-center gap-2 text-xs font-mono uppercase transition-colors ${
-                    activeView === 'crm' ? 'text-[#00d4aa] border-b-2 border-[#00d4aa]' : 'text-[#8f8f9d] hover:text-[#e8e8ed]'
-                  }`}
-                  data-testid="nav-crm"
-                >
-                  <Briefcase size={14} />
-                  CRM
-                </button>
-              </nav>
+            </nav>
             )}
           </div>
 
@@ -1348,15 +1338,9 @@ export default function Dashboard() {
               <ParcelsTable parcels={filteredParcels} projectType={projectType} onSelect={handleParcelClick} />
             </div>
           )}
-
-          {activeView === 'crm' && (
-            <div className="flex-1 p-4">
-              <CRMView />
-            </div>
-          )}
         </div>
       </div>
-      
+
       {/* Mobile Layers Overlay */}
       {isMobile && mobilePanel === 'layers' && (
         <div 
@@ -1400,14 +1384,6 @@ export default function Dashboard() {
           >
             <Table size={18} />
             <span className="text-[10px] font-mono">Tableau</span>
-          </button>
-          <button
-            onClick={() => setActiveView('crm')}
-            className={`flex flex-col items-center gap-0.5 px-4 py-1 ${activeView === 'crm' ? 'text-[#00d4aa]' : 'text-[#8f8f9d]'}`}
-            data-testid="mobile-nav-crm"
-          >
-            <Briefcase size={18} />
-            <span className="text-[10px] font-mono">CRM</span>
           </button>
           <button
             onClick={() => setMobileSidebar(!mobileSidebar)}
@@ -1976,72 +1952,4 @@ function ParcelsTable({ parcels, projectType, onSelect }) {
   );
 }
 
-// CRM View
-function CRMView() {
-  const [shortlists, setShortlists] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchShortlists();
-  }, []);
-
-  const fetchShortlists = async () => {
-    try {
-      const response = await axios.get(`${API}/shortlists`, { withCredentials: true });
-      setShortlists(response.data.shortlists || []);
-    } catch (error) {
-      console.error('Error fetching shortlists:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createShortlist = async () => {
-    const name = prompt('Nom de la shortlist:');
-    if (!name) return;
-    
-    try {
-      await axios.post(`${API}/shortlists`, { nom: name }, { withCredentials: true });
-      fetchShortlists();
-    } catch (error) {
-      console.error('Error creating shortlist:', error);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold" style={{ color: '#e8e8ed' }}>Pipeline CRM</h2>
-        <button onClick={createShortlist} className="btn-primary flex items-center gap-1">
-          <Plus size={14} />
-          Nouvelle shortlist
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center py-8">
-          <div className="loader"></div>
-        </div>
-      ) : shortlists.length === 0 ? (
-        <div className="panel p-8 text-center">
-          <Briefcase size={48} className="mx-auto mb-4" style={{ color: '#8f8f9d' }} />
-          <p style={{ color: '#8f8f9d' }}>Aucune shortlist. Créez-en une pour commencer.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {shortlists.map(sl => (
-            <div key={sl.shortlist_id} className="panel p-4">
-              <h3 className="font-bold mb-2" style={{ color: '#e8e8ed' }}>{sl.nom}</h3>
-              <p className="text-xs mb-3" style={{ color: '#8f8f9d' }}>
-                {sl.item_count || 0} sites · {sl.project_type || 'Tous types'}
-              </p>
-              <button className="btn-secondary w-full text-xs">
-                Voir les sites
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+// End of file
