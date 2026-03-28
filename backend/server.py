@@ -29,6 +29,7 @@ from api_carto import (
 )
 from france_infra_data import get_all_france_infra
 from s3renr_data import S3RENR_DATA, get_s3renr_top_opportunities
+from dc_search_api import dc_search, dc_get_site
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -666,6 +667,66 @@ async def get_s3renr_summary():
             "nb_satures": nb_satures,
         })
     return {"summary": summary}
+
+
+
+# ═══════════════════════════════════════════════════════════
+# DC SEARCH API — AI Agent Endpoints
+# ═══════════════════════════════════════════════════════════
+
+class DCSearchRequest(BaseModel):
+    mw_target: float = Field(default=20, description="Puissance cible en MW")
+    mw_min: float = Field(default=5, description="Puissance minimum acceptable en MW")
+    max_delay_months: int = Field(default=36, description="Délai max de raccordement en mois")
+    surface_min_ha: float = Field(default=0, description="Surface minimum en hectares")
+    region: Optional[str] = Field(default=None, description="Région (ex: IDF, PACA, HdF)")
+    max_distance_substation_km: float = Field(default=100, description="Distance max au poste source")
+    strategy: str = Field(default="balanced", description="Stratégie: speed, cost, power, balanced")
+    grid_priority: bool = Field(default=False, description="Prioriser accès réseau")
+    brownfield_only: bool = Field(default=False, description="Uniquement terrains brownfield")
+    page: int = Field(default=1, description="Page de résultats")
+    per_page: int = Field(default=10, description="Résultats par page (max 50)")
+
+
+@api_router.post("/dc/search")
+async def search_dc_sites(request: DCSearchRequest):
+    """
+    AI Agent endpoint — Search for data center sites.
+    Accepts structured criteria and returns scored, ranked results.
+    Designed for ChatGPT, Claude, or any conversational AI agent.
+    
+    Example: "Trouve-moi 3 terrains pour un DC de 20MW en IDF en moins de 12 mois"
+    """
+    params = request.model_dump()
+    
+    # Log the search for analytics
+    logger.info(f"DC Search: mw={params['mw_target']}, region={params.get('region')}, strategy={params['strategy']}")
+    
+    # Store query in MongoDB for analytics
+    try:
+        db.dc_search_logs.insert_one({
+            "params": params,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "source": "api",
+        })
+    except Exception:
+        pass
+    
+    result = dc_search(params)
+    return result
+
+
+@api_router.get("/dc/site/{site_id}")
+async def get_dc_site_detail(site_id: str):
+    """
+    AI Agent endpoint — Get full details for a specific site.
+    Returns complete site info including grid, timeline, urbanism, and scoring.
+    """
+    site = dc_get_site(site_id)
+    if not site:
+        raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
+    return site
+
 
 
 # ═══════════════════════════════════════════════════════════
