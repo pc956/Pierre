@@ -5,6 +5,98 @@ Cockpit Immo - Seed Data Generator
 import random
 from typing import List, Dict, Any
 
+# Submarine cables
+SUBMARINE_CABLES = [
+    {
+        'cable_id': 'cable_seamewe6',
+        'nom': 'SEA-ME-WE 6',
+        'categorie': 'asie_moyen_orient',
+        'statut': 'en_construction',
+        'capacite_tbps': 100,
+        'geometry': {
+            'type': 'LineString',
+            'coordinates': [[5.38, 43.27], [7.5, 43.5], [10.0, 35.0], [30.0, 31.0], [50.0, 25.0]]
+        }
+    },
+    {
+        'cable_id': 'cable_2africa',
+        'nom': '2Africa',
+        'categorie': 'afrique_mediterranee',
+        'statut': 'en_construction',
+        'capacite_tbps': 180,
+        'geometry': {
+            'type': 'LineString',
+            'coordinates': [[5.38, 43.27], [3.0, 37.0], [-5.0, 35.0], [-10.0, 28.0], [-17.0, 15.0]]
+        }
+    },
+    {
+        'cable_id': 'cable_dunant',
+        'nom': 'Dunant',
+        'categorie': 'transatlantique',
+        'statut': 'operationnel',
+        'capacite_tbps': 250,
+        'geometry': {
+            'type': 'LineString',
+            'coordinates': [[-1.95, 46.74], [-20.0, 45.0], [-40.0, 42.0], [-60.0, 40.0], [-74.0, 40.7]]
+        }
+    },
+    {
+        'cable_id': 'cable_amitie',
+        'nom': 'Amitié',
+        'categorie': 'transatlantique',
+        'statut': 'operationnel',
+        'capacite_tbps': 400,
+        'geometry': {
+            'type': 'LineString',
+            'coordinates': [[-1.18, 44.87], [-25.0, 43.0], [-50.0, 41.0], [-70.0, 40.5]]
+        }
+    },
+    {
+        'cable_id': 'cable_crosschannel',
+        'nom': 'CROSS Channel Fibre',
+        'categorie': 'europe_nord',
+        'statut': 'operationnel',
+        'capacite_tbps': 48,
+        'geometry': {
+            'type': 'LineString',
+            'coordinates': [[1.85, 50.95], [1.3, 51.1], [0.5, 51.3]]
+        }
+    },
+]
+
+# Electrical assets (postes sources + lignes HTB)
+ELECTRICAL_ASSETS = [
+    # Postes sources IDF
+    {'asset_id': 'poste_villepinte', 'nom': 'Poste Villepinte 225kV', 'type': 'poste_htb', 'geometry': {'type': 'Point', 'coordinates': [2.55, 48.96]}, 'tension_kv': 225, 'puissance_mva': 400},
+    {'asset_id': 'poste_roissy', 'nom': 'Poste Roissy 63kV', 'type': 'poste_htb', 'geometry': {'type': 'Point', 'coordinates': [2.52, 49.01]}, 'tension_kv': 63, 'puissance_mva': 150},
+    {'asset_id': 'poste_gonesse', 'nom': 'Poste Gonesse 225kV', 'type': 'poste_htb', 'geometry': {'type': 'Point', 'coordinates': [2.45, 48.98]}, 'tension_kv': 225, 'puissance_mva': 350},
+    {'asset_id': 'poste_cergy', 'nom': 'Poste Cergy 225kV', 'type': 'poste_htb', 'geometry': {'type': 'Point', 'coordinates': [2.06, 49.04]}, 'tension_kv': 225, 'puissance_mva': 300},
+    {'asset_id': 'poste_evry', 'nom': 'Poste Évry 225kV', 'type': 'poste_htb', 'geometry': {'type': 'Point', 'coordinates': [2.44, 48.63]}, 'tension_kv': 225, 'puissance_mva': 280},
+    {'asset_id': 'poste_stdenis', 'nom': 'Poste Saint-Denis 400kV', 'type': 'poste_htb', 'geometry': {'type': 'Point', 'coordinates': [2.36, 48.94]}, 'tension_kv': 400, 'puissance_mva': 600},
+    # Postes PACA
+    {'asset_id': 'poste_marseille', 'nom': 'Poste Marseille Nord 225kV', 'type': 'poste_htb', 'geometry': {'type': 'Point', 'coordinates': [5.38, 43.35]}, 'tension_kv': 225, 'puissance_mva': 450},
+    {'asset_id': 'poste_fos', 'nom': 'Poste Fos 400kV', 'type': 'poste_htb', 'geometry': {'type': 'Point', 'coordinates': [4.95, 43.45]}, 'tension_kv': 400, 'puissance_mva': 800},
+    {'asset_id': 'poste_vitrolles', 'nom': 'Poste Vitrolles 225kV', 'type': 'poste_htb', 'geometry': {'type': 'Point', 'coordinates': [5.25, 43.46]}, 'tension_kv': 225, 'puissance_mva': 320},
+    # Postes AuRA
+    {'asset_id': 'poste_lyon', 'nom': 'Poste Lyon Est 225kV', 'type': 'poste_htb', 'geometry': {'type': 'Point', 'coordinates': [4.95, 45.74]}, 'tension_kv': 225, 'puissance_mva': 380},
+    {'asset_id': 'poste_stpriest', 'nom': 'Poste Saint-Priest 63kV', 'type': 'poste_htb', 'geometry': {'type': 'Point', 'coordinates': [4.94, 45.70]}, 'tension_kv': 63, 'puissance_mva': 120},
+    # Postes HdF
+    {'asset_id': 'poste_lille', 'nom': 'Poste Lille Sud 225kV', 'type': 'poste_htb', 'geometry': {'type': 'Point', 'coordinates': [3.08, 50.58]}, 'tension_kv': 225, 'puissance_mva': 350},
+    {'asset_id': 'poste_dunkerque', 'nom': 'Poste Dunkerque 400kV', 'type': 'poste_htb', 'geometry': {'type': 'Point', 'coordinates': [2.38, 51.03]}, 'tension_kv': 400, 'puissance_mva': 700},
+    # Postes Occitanie
+    {'asset_id': 'poste_toulouse', 'nom': 'Poste Toulouse Blagnac 225kV', 'type': 'poste_htb', 'geometry': {'type': 'Point', 'coordinates': [1.40, 43.64]}, 'tension_kv': 225, 'puissance_mva': 340},
+    
+    # Lignes 400kV (principales)
+    {'asset_id': 'ligne_400_idf1', 'nom': 'Ligne 400kV IDF Nord', 'type': 'ligne_400kv', 'geometry': {'type': 'LineString', 'coordinates': [[2.36, 48.94], [2.45, 48.98], [2.55, 48.96], [2.65, 48.95]]}, 'tension_kv': 400},
+    {'asset_id': 'ligne_400_paca1', 'nom': 'Ligne 400kV PACA', 'type': 'ligne_400kv', 'geometry': {'type': 'LineString', 'coordinates': [[4.95, 43.45], [5.25, 43.46], [5.38, 43.35], [5.45, 43.52]]},'tension_kv': 400},
+    
+    # Lignes 225kV
+    {'asset_id': 'ligne_225_idf1', 'nom': 'Ligne 225kV IDF Est', 'type': 'ligne_225kv', 'geometry': {'type': 'LineString', 'coordinates': [[2.55, 48.96], [2.60, 48.90], [2.65, 48.83], [2.70, 48.82]]}, 'tension_kv': 225},
+    {'asset_id': 'ligne_225_idf2', 'nom': 'Ligne 225kV IDF Ouest', 'type': 'ligne_225kv', 'geometry': {'type': 'LineString', 'coordinates': [[2.06, 49.04], [2.03, 48.93], [2.04, 48.88]]}, 'tension_kv': 225},
+    {'asset_id': 'ligne_225_lyon', 'nom': 'Ligne 225kV Lyon', 'type': 'ligne_225kv', 'geometry': {'type': 'LineString', 'coordinates': [[4.85, 45.75], [4.95, 45.74], [5.00, 45.70], [4.94, 45.66]]}, 'tension_kv': 225},
+    {'asset_id': 'ligne_225_hdf', 'nom': 'Ligne 225kV Lille', 'type': 'ligne_225kv', 'geometry': {'type': 'LineString', 'coordinates': [[3.08, 50.58], [3.12, 50.63], [3.18, 50.69]]}, 'tension_kv': 225},
+]
+
 # Landing points France
 LANDING_POINTS = [
     {
@@ -363,4 +455,6 @@ def get_seed_data() -> Dict[str, Any]:
         'parcels': generate_all_parcels(),
         'landing_points': LANDING_POINTS,
         'dc_existants': DC_EXISTANTS,
+        'submarine_cables': SUBMARINE_CABLES,
+        'electrical_assets': ELECTRICAL_ASSETS,
     }

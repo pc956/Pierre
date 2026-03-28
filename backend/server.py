@@ -511,6 +511,23 @@ async def get_map_landing_points():
     return {"landing_points": lps}
 
 
+@api_router.get("/map/submarine-cables")
+async def get_map_submarine_cables():
+    """Get submarine cables for map"""
+    cables = await db.submarine_cables.find({}, {"_id": 0}).to_list(50)
+    return {"submarine_cables": cables}
+
+
+@api_router.get("/map/electrical-assets")
+async def get_map_electrical_assets(asset_type: Optional[str] = None):
+    """Get electrical assets (postes HTB, lignes) for map"""
+    query = {}
+    if asset_type:
+        query["type"] = asset_type
+    assets = await db.electrical_assets.find(query, {"_id": 0}).to_list(200)
+    return {"electrical_assets": assets}
+
+
 # ═══════════════════════════════════════════════════════════
 # CRM ENDPOINTS
 # ═══════════════════════════════════════════════════════════
@@ -711,6 +728,8 @@ async def seed_database():
     await db.parcel_scores.delete_many({})
     await db.dc_existants.delete_many({})
     await db.landing_points.delete_many({})
+    await db.submarine_cables.delete_many({})
+    await db.electrical_assets.delete_many({})
     
     # Insert parcels
     if seed_data["parcels"]:
@@ -723,6 +742,14 @@ async def seed_database():
     # Insert landing points
     if seed_data["landing_points"]:
         await db.landing_points.insert_many(seed_data["landing_points"])
+    
+    # Insert submarine cables
+    if seed_data.get("submarine_cables"):
+        await db.submarine_cables.insert_many(seed_data["submarine_cables"])
+    
+    # Insert electrical assets
+    if seed_data.get("electrical_assets"):
+        await db.electrical_assets.insert_many(seed_data["electrical_assets"])
     
     # Compute scores for all parcels (colocation_t3 as default)
     for parcel in seed_data["parcels"]:
@@ -737,7 +764,9 @@ async def seed_database():
         "success": True,
         "parcels_count": len(seed_data["parcels"]),
         "dc_count": len(seed_data["dc_existants"]),
-        "landing_points_count": len(seed_data["landing_points"])
+        "landing_points_count": len(seed_data["landing_points"]),
+        "submarine_cables_count": len(seed_data.get("submarine_cables", [])),
+        "electrical_assets_count": len(seed_data.get("electrical_assets", []))
     }
 
 

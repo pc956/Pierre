@@ -5,13 +5,47 @@ import axios from 'axios';
 import { 
   Server, Map as MapIcon, Table, Briefcase, Bell, Settings, LogOut, 
   Search, Filter, ChevronDown, Plus, Zap, Wifi, Droplets, Square,
-  TrendingUp, Clock, AlertTriangle, CheckCircle, XCircle, RefreshCw
+  TrendingUp, Clock, AlertTriangle, CheckCircle, XCircle, RefreshCw,
+  Layers, Eye, EyeOff, Anchor, Cable
 } from 'lucide-react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap, Marker, Polyline } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+
+// Custom icons for map markers
+const createIcon = (color, size = 10) => L.divIcon({
+  className: 'custom-icon',
+  html: `<div style="width:${size}px;height:${size}px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,0.5);"></div>`,
+  iconSize: [size, size],
+  iconAnchor: [size/2, size/2],
+});
+
+const posteIcon = (tension) => {
+  const color = tension >= 400 ? '#ff4757' : tension >= 225 ? '#ffa502' : '#3b82f6';
+  return L.divIcon({
+    className: 'poste-icon',
+    html: `<div style="width:14px;height:14px;background:${color};border:2px solid #fff;transform:rotate(45deg);box-shadow:0 2px 4px rgba(0,0,0,0.5);"></div>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+};
+
+const landingIcon = L.divIcon({
+  className: 'landing-icon',
+  html: `<div style="width:16px;height:16px;background:#00d4aa;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;color:#0a0a0f;font-weight:bold;">⚓</div>`,
+  iconSize: [16, 16],
+  iconAnchor: [8, 8],
+});
+
+const dcIcon = L.divIcon({
+  className: 'dc-icon',
+  html: `<div style="width:14px;height:14px;background:#8b5cf6;border:2px solid #fff;border-radius:2px;box-shadow:0 2px 4px rgba(0,0,0,0.5);"></div>`,
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
+});
 
 // Map component to handle bounds
 function MapBounds({ parcels }) {
@@ -69,12 +103,35 @@ export default function Dashboard() {
   const [regionFilter, setRegionFilter] = useState('');
   const [scoreMin, setScoreMin] = useState(0);
   const [stats, setStats] = useState(null);
+  
+  // Map layers data
+  const [landingPoints, setLandingPoints] = useState([]);
+  const [dcExistants, setDcExistants] = useState([]);
+  const [submarineCables, setSubmarineCables] = useState([]);
+  const [electricalAssets, setElectricalAssets] = useState([]);
+  
+  // Layer visibility
+  const [showLayers, setShowLayers] = useState(false);
+  const [layers, setLayers] = useState({
+    parcels: true,
+    postes_htb: true,
+    lignes_400kv: true,
+    lignes_225kv: false,
+    landing_points: true,
+    submarine_cables: true,
+    dc_existants: true,
+  });
 
   // Fetch parcels
   useEffect(() => {
     fetchParcels();
     fetchStats();
   }, [projectType, regionFilter, scoreMin]);
+
+  // Fetch map layers data
+  useEffect(() => {
+    fetchMapLayers();
+  }, []);
 
   const fetchParcels = async () => {
     setLoading(true);
@@ -104,8 +161,29 @@ export default function Dashboard() {
     }
   };
 
+  const fetchMapLayers = async () => {
+    try {
+      const [lpRes, dcRes, cablesRes, elecRes] = await Promise.all([
+        axios.get(`${API}/map/landing-points`),
+        axios.get(`${API}/map/dc`),
+        axios.get(`${API}/map/submarine-cables`),
+        axios.get(`${API}/map/electrical-assets`),
+      ]);
+      setLandingPoints(lpRes.data.landing_points || []);
+      setDcExistants(dcRes.data.dc_existants || []);
+      setSubmarineCables(cablesRes.data.submarine_cables || []);
+      setElectricalAssets(elecRes.data.electrical_assets || []);
+    } catch (error) {
+      console.error('Error fetching map layers:', error);
+    }
+  };
+
   const handleParcelClick = (parcel) => {
     setSelectedParcel(parcel);
+  };
+
+  const toggleLayer = (layerName) => {
+    setLayers(prev => ({ ...prev, [layerName]: !prev[layerName] }));
   };
 
   const PROJECT_TYPES = [
@@ -124,6 +202,11 @@ export default function Dashboard() {
     { value: 'HdF', label: 'Hauts-de-France' },
     { value: 'Occitanie', label: 'Occitanie' },
   ];
+
+  // Filter electrical assets by type
+  const postes = electricalAssets.filter(a => a.type === 'poste_htb');
+  const lignes400 = electricalAssets.filter(a => a.type === 'ligne_400kv');
+  const lignes225 = electricalAssets.filter(a => a.type === 'ligne_225kv');
 
   return (
     <div className="h-screen flex flex-col" style={{ background: '#0a0a0f' }}>
@@ -272,7 +355,7 @@ export default function Dashboard() {
 
           <div className="ml-auto flex items-center gap-4">
             <span className="text-xs font-mono" style={{ color: '#8f8f9d' }}>
-              {parcels.length} sites · {stats?.regions?.IDF || 0} IDF
+              {parcels.length} sites · {postes.length} postes · {landingPoints.length} landing pts
             </span>
           </div>
         </div>
@@ -289,8 +372,8 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   <MapContainer
-                    center={[48.8566, 2.3522]}
-                    zoom={8}
+                    center={[46.5, 2.5]}
+                    zoom={6}
                     style={{ height: '100%', width: '100%' }}
                   >
                     <TileLayer
@@ -299,7 +382,120 @@ export default function Dashboard() {
                     />
                     <MapBounds parcels={parcels} />
                     
-                    {parcels.map(parcel => {
+                    {/* Submarine cables */}
+                    {layers.submarine_cables && submarineCables.map(cable => (
+                      <Polyline
+                        key={cable.cable_id}
+                        positions={cable.geometry.coordinates.map(c => [c[1], c[0]])}
+                        pathOptions={{ 
+                          color: cable.statut === 'operationnel' ? '#00d4aa' : '#ffa502',
+                          weight: 3,
+                          opacity: 0.7,
+                          dashArray: cable.statut === 'en_construction' ? '10,5' : null
+                        }}
+                      >
+                        <Popup>
+                          <div className="p-2">
+                            <p className="font-bold">{cable.nom}</p>
+                            <p className="text-xs text-gray-400">
+                              {cable.capacite_tbps} Tbps · {cable.statut === 'operationnel' ? 'Opérationnel' : 'En construction'}
+                            </p>
+                          </div>
+                        </Popup>
+                      </Polyline>
+                    ))}
+                    
+                    {/* Lignes 400kV */}
+                    {layers.lignes_400kv && lignes400.map(ligne => (
+                      <Polyline
+                        key={ligne.asset_id}
+                        positions={ligne.geometry.coordinates.map(c => [c[1], c[0]])}
+                        pathOptions={{ color: '#ff4757', weight: 3, opacity: 0.8 }}
+                      >
+                        <Popup>
+                          <div className="p-2">
+                            <p className="font-bold">{ligne.nom}</p>
+                            <p className="text-xs text-gray-400">Ligne 400 kV</p>
+                          </div>
+                        </Popup>
+                      </Polyline>
+                    ))}
+                    
+                    {/* Lignes 225kV */}
+                    {layers.lignes_225kv && lignes225.map(ligne => (
+                      <Polyline
+                        key={ligne.asset_id}
+                        positions={ligne.geometry.coordinates.map(c => [c[1], c[0]])}
+                        pathOptions={{ color: '#ffa502', weight: 2, opacity: 0.7 }}
+                      >
+                        <Popup>
+                          <div className="p-2">
+                            <p className="font-bold">{ligne.nom}</p>
+                            <p className="text-xs text-gray-400">Ligne 225 kV</p>
+                          </div>
+                        </Popup>
+                      </Polyline>
+                    ))}
+                    
+                    {/* Postes HTB */}
+                    {layers.postes_htb && postes.map(poste => (
+                      <Marker
+                        key={poste.asset_id}
+                        position={[poste.geometry.coordinates[1], poste.geometry.coordinates[0]]}
+                        icon={posteIcon(poste.tension_kv)}
+                      >
+                        <Popup>
+                          <div className="p-2">
+                            <p className="font-bold">{poste.nom}</p>
+                            <p className="text-xs text-gray-400">
+                              {poste.tension_kv} kV · {poste.puissance_mva} MVA
+                            </p>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+                    
+                    {/* Landing points */}
+                    {layers.landing_points && landingPoints.map(lp => (
+                      <Marker
+                        key={lp.landing_id}
+                        position={[lp.geometry.coordinates[1], lp.geometry.coordinates[0]]}
+                        icon={landingIcon}
+                      >
+                        <Popup>
+                          <div className="p-2">
+                            <p className="font-bold">{lp.nom}</p>
+                            <p className="text-xs text-gray-400">
+                              {lp.nb_cables_connectes} câbles · {lp.is_major_hub ? 'Hub majeur' : 'Landing point'}
+                            </p>
+                            {lp.cables_noms && (
+                              <p className="text-xs mt-1">{lp.cables_noms.slice(0,3).join(', ')}</p>
+                            )}
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+                    
+                    {/* DC existants */}
+                    {layers.dc_existants && dcExistants.map(dc => (
+                      <Marker
+                        key={dc.dc_id}
+                        position={[dc.geometry.coordinates[1], dc.geometry.coordinates[0]]}
+                        icon={dcIcon}
+                      >
+                        <Popup>
+                          <div className="p-2">
+                            <p className="font-bold">{dc.nom}</p>
+                            <p className="text-xs text-gray-400">
+                              {dc.operateur} · {dc.puissance_mw} MW · {dc.tier}
+                            </p>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+                    
+                    {/* Parcels */}
+                    {layers.parcels && parcels.map(parcel => {
                       const score = parcel.score?.score_net || 0;
                       const mw = parcel.score?.power_mw_p50 || 10;
                       
@@ -333,6 +529,81 @@ export default function Dashboard() {
                     })}
                   </MapContainer>
                 )}
+                
+                {/* Layer control */}
+                <div 
+                  className="absolute top-4 right-4 z-[1000]"
+                  style={{ minWidth: 200 }}
+                >
+                  <button
+                    onClick={() => setShowLayers(!showLayers)}
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-mono uppercase"
+                    style={{ background: '#12121a', border: '1px solid #1f1f2e', color: '#e8e8ed' }}
+                    data-testid="layers-toggle"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Layers size={14} />
+                      Couches
+                    </span>
+                    <ChevronDown size={14} className={`transition-transform ${showLayers ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {showLayers && (
+                    <div 
+                      className="mt-1 p-2 space-y-1"
+                      style={{ background: '#12121a', border: '1px solid #1f1f2e' }}
+                    >
+                      <LayerToggle 
+                        label="Parcelles" 
+                        color="#00d4aa" 
+                        active={layers.parcels} 
+                        onClick={() => toggleLayer('parcels')} 
+                      />
+                      <LayerToggle 
+                        label="Postes HTB" 
+                        color="#ffa502" 
+                        icon="◆"
+                        active={layers.postes_htb} 
+                        onClick={() => toggleLayer('postes_htb')} 
+                      />
+                      <LayerToggle 
+                        label="Lignes 400kV" 
+                        color="#ff4757" 
+                        icon="─"
+                        active={layers.lignes_400kv} 
+                        onClick={() => toggleLayer('lignes_400kv')} 
+                      />
+                      <LayerToggle 
+                        label="Lignes 225kV" 
+                        color="#ffa502" 
+                        icon="─"
+                        active={layers.lignes_225kv} 
+                        onClick={() => toggleLayer('lignes_225kv')} 
+                      />
+                      <LayerToggle 
+                        label="Landing Points" 
+                        color="#00d4aa" 
+                        icon="⚓"
+                        active={layers.landing_points} 
+                        onClick={() => toggleLayer('landing_points')} 
+                      />
+                      <LayerToggle 
+                        label="Câbles sous-marins" 
+                        color="#00d4aa" 
+                        icon="〰"
+                        active={layers.submarine_cables} 
+                        onClick={() => toggleLayer('submarine_cables')} 
+                      />
+                      <LayerToggle 
+                        label="DC existants" 
+                        color="#8b5cf6" 
+                        icon="■"
+                        active={layers.dc_existants} 
+                        onClick={() => toggleLayer('dc_existants')} 
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Side panel */}
@@ -351,8 +622,36 @@ export default function Dashboard() {
                       Cliquez sur un cercle sur la carte pour voir les détails de la parcelle.
                     </p>
                     
+                    {/* Legend */}
+                    <div className="mt-6 space-y-2">
+                      <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Légende</p>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span style={{ width: 12, height: 12, background: '#ff4757', transform: 'rotate(45deg)' }}></span>
+                          <span style={{ color: '#e8e8ed' }}>Poste 400kV</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span style={{ width: 12, height: 12, background: '#ffa502', transform: 'rotate(45deg)' }}></span>
+                          <span style={{ color: '#e8e8ed' }}>Poste 225kV</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span style={{ width: 12, height: 12, background: '#3b82f6', transform: 'rotate(45deg)' }}></span>
+                          <span style={{ color: '#e8e8ed' }}>Poste 63kV</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span style={{ color: '#00d4aa', fontSize: 14 }}>⚓</span>
+                          <span style={{ color: '#e8e8ed' }}>Landing point</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span style={{ width: 12, height: 12, background: '#8b5cf6', borderRadius: 2 }}></span>
+                          <span style={{ color: '#e8e8ed' }}>DC existant</span>
+                        </div>
+                      </div>
+                    </div>
+                    
                     {/* Quick stats */}
                     <div className="mt-6 space-y-3">
+                      <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Statistiques</p>
                       <div className="flex items-center justify-between">
                         <span className="text-xs" style={{ color: '#8f8f9d' }}>Sites GO</span>
                         <span className="font-mono text-sm" style={{ color: '#00d4aa' }}>
@@ -392,6 +691,25 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Layer toggle component
+function LayerToggle({ label, color, icon, active, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center justify-between px-2 py-1.5 text-xs hover:bg-[#1f1f2e] transition-colors"
+      style={{ color: active ? '#e8e8ed' : '#8f8f9d' }}
+    >
+      <span className="flex items-center gap-2">
+        <span style={{ color, fontSize: icon ? 12 : 10 }}>
+          {icon || '●'}
+        </span>
+        {label}
+      </span>
+      {active ? <Eye size={12} /> : <EyeOff size={12} />}
+    </button>
   );
 }
 
@@ -446,6 +764,31 @@ function ParcelDetail({ parcel, projectType, onClose }) {
             <p className="text-lg font-mono font-bold" style={{ color: '#00d4aa' }}>
               {score.irr_levered_pct?.toFixed(1) || '-'}%
             </p>
+          </div>
+        </div>
+
+        {/* Infrastructure */}
+        <div className="panel p-3">
+          <p className="text-xs font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>Infrastructure</p>
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span style={{ color: '#8f8f9d' }}>Poste HTB</span>
+              <span className="font-mono" style={{ color: '#e8e8ed' }}>
+                {parcel.dist_poste_htb_m ? `${(parcel.dist_poste_htb_m/1000).toFixed(1)} km` : '-'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span style={{ color: '#8f8f9d' }}>Landing point</span>
+              <span className="font-mono" style={{ color: '#e8e8ed' }}>
+                {parcel.landing_point_nom || '-'} ({parcel.dist_landing_point_km?.toFixed(0)} km)
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span style={{ color: '#8f8f9d' }}>Câbles sous-marins</span>
+              <span className="font-mono" style={{ color: '#00d4aa' }}>
+                {parcel.landing_point_nb_cables || 0} câbles
+              </span>
+            </div>
           </div>
         </div>
 
