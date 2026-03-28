@@ -26,6 +26,7 @@ from api_carto import (
     search_communes, get_parcelles_by_commune, get_parcelles_by_bbox,
     get_parcelles_around_point, get_sections_by_commune, parse_parcelle_feature
 )
+from france_infra_data import get_all_france_infra
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -452,8 +453,11 @@ async def compare_parcels(parcel_ids: List[str], project_type: str = "colocation
 
 
 # ═══════════════════════════════════════════════════════════
-# MAP ENDPOINTS
+# MAP ENDPOINTS - Serve nationwide infrastructure from in-memory data
 # ═══════════════════════════════════════════════════════════
+
+# Load France infrastructure once at import time
+_FRANCE_INFRA = get_all_france_infra()
 
 @api_router.get("/map/parcels")
 async def get_map_parcels(
@@ -503,33 +507,29 @@ async def get_map_parcels(
 
 @api_router.get("/map/dc")
 async def get_map_dc():
-    """Get DC existants for map"""
-    dcs = await db.dc_existants.find({}, {"_id": 0}).to_list(100)
-    return {"dc_existants": dcs}
+    """Get all DC existants for map - nationwide from in-memory data"""
+    return {"dc_existants": _FRANCE_INFRA["dc_existants"]}
 
 
 @api_router.get("/map/landing-points")
 async def get_map_landing_points():
-    """Get landing points for map"""
-    lps = await db.landing_points.find({}, {"_id": 0}).to_list(50)
-    return {"landing_points": lps}
+    """Get all landing points for map - nationwide from in-memory data"""
+    return {"landing_points": _FRANCE_INFRA["landing_points"]}
 
 
 @api_router.get("/map/submarine-cables")
 async def get_map_submarine_cables():
-    """Get submarine cables for map"""
-    cables = await db.submarine_cables.find({}, {"_id": 0}).to_list(50)
-    return {"submarine_cables": cables}
+    """Get all submarine cables for map - nationwide from in-memory data"""
+    return {"submarine_cables": _FRANCE_INFRA["submarine_cables"]}
 
 
 @api_router.get("/map/electrical-assets")
 async def get_map_electrical_assets(asset_type: Optional[str] = None):
-    """Get electrical assets (postes HTB, lignes) for map"""
-    query = {}
+    """Get electrical assets (postes HTB) for map - nationwide from in-memory data"""
+    postes = _FRANCE_INFRA["postes_htb"]
     if asset_type:
-        query["type"] = asset_type
-    assets = await db.electrical_assets.find(query, {"_id": 0}).to_list(200)
-    return {"electrical_assets": assets}
+        postes = [p for p in postes if p.get("type") == asset_type]
+    return {"electrical_assets": postes}
 
 
 # ═══════════════════════════════════════════════════════════
@@ -560,13 +560,41 @@ async def get_commune_parcelles(code_insee: str, section: Optional[str] = None, 
         parsed = parse_parcelle_feature(feature)
         
         # Only include parcels > 0.5 ha for DC relevance
-        if parsed["surface_ha"] >= 0.5:
-            # Add placeholder infrastructure data for scoring
-            parsed["dist_poste_htb_m"] = 10000  # Default estimate
+        if parsed["surface_ha"] >= 0.5 and parsed.get("centroid"):
+            plat = parsed["latitude"]
+            plon = parsed["longitude"]
+            
+            # Find nearest HTB post
+            min_dist_htb = 999999
+            nearest_htb_kv = 0
+            for htb in _FRANCE_INFRA["postes_htb"]:
+                hcoords = htb["geometry"]["coordinates"]
+                dist = _haversine(plon, plat, hcoords[0], hcoords[1])
+                if dist < min_dist_htb:
+                    min_dist_htb = dist
+                    nearest_htb_kv = htb["tension_kv"]
+            
+            # Find nearest landing point
+            min_dist_lp = 999999
+            nearest_lp_name = ""
+            nearest_lp_cables = 0
+            for lp in _FRANCE_INFRA["landing_points"]:
+                lcoords = lp["geometry"]["coordinates"]
+                dist = _haversine(plon, plat, lcoords[0], lcoords[1])
+                if dist < min_dist_lp:
+                    min_dist_lp = dist
+                    nearest_lp_name = lp["nom"]
+                    nearest_lp_cables = lp["nb_cables_connectes"]
+            
+            parsed["dist_poste_htb_m"] = int(min_dist_htb)
+            parsed["tension_htb_kv"] = nearest_htb_kv
+            parsed["dist_landing_point_km"] = round(min_dist_lp / 1000, 1)
+            parsed["landing_point_nom"] = nearest_lp_name
+            parsed["landing_point_nb_cables"] = nearest_lp_cables
             parsed["dist_poste_hta_m"] = 3000
             parsed["dist_backbone_fibre_m"] = 2000
             parsed["nb_operateurs_fibre"] = 2
-            parsed["plu_zone"] = "U"  # Unknown, default to urban
+            parsed["plu_zone"] = "U"
             parsed["zone_saturation"] = "inconnu"
             
             # Compute score
@@ -577,7 +605,7 @@ async def get_commune_parcelles(code_insee: str, section: Optional[str] = None, 
                     "verdict": score_data.get("verdict", "CONDITIONNEL"),
                     "power_mw_p50": score_data.get("power_mw_p50", 0),
                 }
-            except Exception as e:
+            except Exception:
                 parsed["score"] = {"score_net": 0, "verdict": "CONDITIONNEL"}
             
             parcelles.append(parsed)
@@ -603,17 +631,65 @@ async def get_bbox_parcelles(
     Get parcelles within a bounding box from API Carto
     Use for map viewport queries
     """
+    import math
+    
     data = await get_parcelles_by_bbox(min_lon, min_lat, max_lon, max_lat, limit)
     
     parcelles = []
     for feature in data.get("features", [])[:limit]:
         parsed = parse_parcelle_feature(feature)
         
-        if parsed["surface_ha"] >= 0.3:
-            # Add default infrastructure data
-            parsed["dist_poste_htb_m"] = 10000
-            parsed["dist_backbone_fibre_m"] = 2000
-            parsed["plu_zone"] = "U"
+        if parsed["surface_ha"] >= 0.3 and parsed.get("centroid"):
+            # Compute real distances to nearest infrastructure
+            plat = parsed["latitude"]
+            plon = parsed["longitude"]
+            
+            # Find nearest HTB post
+            min_dist_htb = 999999
+            nearest_htb_kv = 0
+            for htb in _FRANCE_INFRA["postes_htb"]:
+                hcoords = htb["geometry"]["coordinates"]
+                dist = _haversine(plon, plat, hcoords[0], hcoords[1])
+                if dist < min_dist_htb:
+                    min_dist_htb = dist
+                    nearest_htb_kv = htb["tension_kv"]
+            
+            # Find nearest landing point
+            min_dist_lp = 999999
+            nearest_lp_name = ""
+            nearest_lp_cables = 0
+            for lp in _FRANCE_INFRA["landing_points"]:
+                lcoords = lp["geometry"]["coordinates"]
+                dist = _haversine(plon, plat, lcoords[0], lcoords[1])
+                if dist < min_dist_lp:
+                    min_dist_lp = dist
+                    nearest_lp_name = lp["nom"]
+                    nearest_lp_cables = lp["nb_cables_connectes"]
+            
+            parsed["dist_poste_htb_m"] = int(min_dist_htb)
+            parsed["tension_htb_kv"] = nearest_htb_kv
+            parsed["dist_landing_point_km"] = round(min_dist_lp / 1000, 1)
+            parsed["landing_point_nom"] = nearest_lp_name
+            parsed["landing_point_nb_cables"] = nearest_lp_cables
+            parsed["dist_backbone_fibre_m"] = 2000  # Default
+            parsed["nb_operateurs_fibre"] = 2
+            parsed["plu_zone"] = "U"  # Default
+            parsed["zone_saturation"] = "inconnu"
+            
+            # Compute score
+            try:
+                score_data = compute_full_score(parsed, project_type)
+                parsed["score"] = {
+                    "score_net": score_data.get("score_net", 0),
+                    "verdict": score_data.get("verdict", "CONDITIONNEL"),
+                    "power_mw_p50": score_data.get("power_mw_p50", 0),
+                    "score_electricite": score_data.get("score_electricite", 0),
+                    "score_fibre": score_data.get("score_fibre", 0),
+                    "ttm_min_months": score_data.get("ttm_min_months"),
+                    "ttm_max_months": score_data.get("ttm_max_months"),
+                }
+            except Exception:
+                parsed["score"] = {"score_net": 0, "verdict": "CONDITIONNEL"}
             
             parcelles.append(parsed)
     
@@ -622,6 +698,17 @@ async def get_bbox_parcelles(
         "count": len(parcelles),
         "source": "api_carto_ign"
     }
+
+
+def _haversine(lon1, lat1, lon2, lat2):
+    """Calculate distance in meters between two GPS points"""
+    import math
+    R = 6371000  # Earth radius in meters
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
 
 @api_router.get("/france/parcelles/around")

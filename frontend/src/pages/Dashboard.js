@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -6,9 +6,9 @@ import {
   Server, Map as MapIcon, Table, Briefcase, Bell, Settings, LogOut, 
   Search, Filter, ChevronDown, Plus, Zap, Wifi, Droplets, Square,
   TrendingUp, Clock, AlertTriangle, CheckCircle, XCircle, RefreshCw,
-  Layers, Eye, EyeOff, Anchor, Cable, Building2, ExternalLink, X
+  Layers, Eye, EyeOff, Anchor, Cable, Building2, ExternalLink, X, Loader
 } from 'lucide-react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap, Marker, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents, Marker, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -47,18 +47,25 @@ const dcIcon = L.divIcon({
   iconAnchor: [7, 7],
 });
 
-// Map component to handle bounds
-function MapBounds({ parcels }) {
-  const map = useMap();
-  
-  useEffect(() => {
-    if (parcels.length > 0) {
-      const bounds = parcels.map(p => [p.latitude, p.longitude]);
-      if (bounds.length > 0) {
-        map.fitBounds(bounds, { padding: [50, 50] });
-      }
-    }
-  }, [parcels, map]);
+// Map component to handle viewport-based dynamic parcel loading
+function MapEventHandler({ onBoundsChange, onZoomChange }) {
+  const map = useMapEvents({
+    moveend: () => {
+      const bounds = map.getBounds();
+      const zoom = map.getZoom();
+      onZoomChange(zoom);
+      onBoundsChange({
+        min_lon: bounds.getWest(),
+        min_lat: bounds.getSouth(),
+        max_lon: bounds.getEast(),
+        max_lat: bounds.getNorth(),
+        zoom,
+      });
+    },
+    zoomend: () => {
+      onZoomChange(map.getZoom());
+    },
+  });
   
   return null;
 }
@@ -96,13 +103,10 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState('map');
-  const [parcels, setParcels] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState(null);
   const [projectType, setProjectType] = useState('colocation_t3');
-  const [regionFilter, setRegionFilter] = useState('');
   const [scoreMin, setScoreMin] = useState(0);
-  const [stats, setStats] = useState(null);
   
   // Map layers data
   const [landingPoints, setLandingPoints] = useState([]);
@@ -130,7 +134,12 @@ export default function Dashboard() {
   const [communeResults, setCommuneResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [franceParcels, setFranceParcels] = useState([]);
-  const [showFranceSearch, setShowFranceSearch] = useState(false);
+  
+  // Viewport-based dynamic loading
+  const [mapZoom, setMapZoom] = useState(6);
+  const [bboxLoading, setBboxLoading] = useState(false);
+  const bboxTimerRef = useRef(null);
+  const MIN_ZOOM_FOR_PARCELS = 14;
   
   // Advanced filters
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -209,7 +218,6 @@ export default function Dashboard() {
         const unique = newParcels.filter(p => !existing.has(p.parcel_id));
         return [...prev, ...unique];
       });
-      alert(`${newParcels.length} parcelles chargées autour de ${name}`);
     } catch (error) {
       console.error('Error loading parcels around point:', error);
     } finally {
@@ -217,19 +225,44 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch parcels
-  useEffect(() => {
-    fetchParcels();
-    fetchStats();
-  }, [projectType, regionFilter, scoreMin]);
+  // Load parcels dynamically from viewport BBox
+  const loadBboxParcels = useCallback(async (bounds) => {
+    if (bounds.zoom < MIN_ZOOM_FOR_PARCELS) return;
+    
+    setBboxLoading(true);
+    try {
+      const response = await axios.get(
+        `${API}/france/parcelles/bbox?min_lon=${bounds.min_lon}&min_lat=${bounds.min_lat}&max_lon=${bounds.max_lon}&max_lat=${bounds.max_lat}&project_type=${projectType}&limit=200`
+      );
+      const newParcels = response.data.parcelles || [];
+      setFranceParcels(prev => {
+        const existing = new Set(prev.map(p => p.parcel_id));
+        const unique = newParcels.filter(p => !existing.has(p.parcel_id));
+        if (unique.length === 0) return prev;
+        return [...prev, ...unique];
+      });
+    } catch (error) {
+      console.error('Error loading bbox parcels:', error);
+    } finally {
+      setBboxLoading(false);
+    }
+  }, [projectType]);
 
-  // Fetch map layers data
+  // Debounced BBox handler
+  const handleBoundsChange = useCallback((bounds) => {
+    if (bboxTimerRef.current) clearTimeout(bboxTimerRef.current);
+    bboxTimerRef.current = setTimeout(() => {
+      loadBboxParcels(bounds);
+    }, 600);
+  }, [loadBboxParcels]);
+
+  // Fetch map layers data (infrastructure)
   useEffect(() => {
     fetchMapLayers();
   }, []);
   
-  // Combine seed parcels with France parcels
-  const allParcels = [...parcels, ...franceParcels];
+  // France parcels only (no more seed parcels)
+  const allParcels = franceParcels;
   
   // Apply advanced filters client-side
   const filteredParcels = allParcels.filter(p => {
@@ -251,34 +284,6 @@ export default function Dashboard() {
     
     return true;
   });
-
-  const fetchParcels = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        project_type: projectType,
-        limit: '100'
-      });
-      if (regionFilter) params.append('region', regionFilter);
-      if (scoreMin > 0) params.append('score_min', scoreMin.toString());
-      
-      const response = await axios.get(`${API}/parcels?${params}`, { withCredentials: true });
-      setParcels(response.data.parcels || []);
-    } catch (error) {
-      console.error('Error fetching parcels:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const response = await axios.get(`${API}/admin/stats`, { withCredentials: true });
-      setStats(response.data);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
 
   const fetchMapLayers = async () => {
     try {
@@ -311,15 +316,6 @@ export default function Dashboard() {
     { value: 'hyperscale', label: 'Hyperscale' },
     { value: 'edge', label: 'Edge DC' },
     { value: 'ai_campus', label: 'AI Campus' },
-  ];
-
-  const REGIONS = [
-    { value: '', label: 'Toutes régions' },
-    { value: 'IDF', label: 'Île-de-France' },
-    { value: 'PACA', label: 'PACA' },
-    { value: 'AuRA', label: 'Auvergne-Rhône-Alpes' },
-    { value: 'HdF', label: 'Hauts-de-France' },
-    { value: 'Occitanie', label: 'Occitanie' },
   ];
 
   // Filter electrical assets by type
@@ -478,21 +474,6 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Région:</label>
-            <select
-              value={regionFilter}
-              onChange={(e) => setRegionFilter(e.target.value)}
-              className="h-7 px-2 text-xs"
-              style={{ minWidth: 140 }}
-              data-testid="region-select"
-            >
-              {REGIONS.map(r => (
-                <option key={r.value} value={r.value}>{r.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
             <label className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Score min:</label>
             <input
               type="range"
@@ -520,31 +501,28 @@ export default function Dashboard() {
             )}
           </button>
 
-          <button
-            onClick={fetchParcels}
-            className="btn-primary flex items-center gap-1"
-            data-testid="refresh-btn"
-          >
-            <RefreshCw size={12} />
-            Actualiser
-          </button>
-
           <div className="ml-auto flex items-center gap-4">
-            <span className="text-xs font-mono" style={{ color: '#8f8f9d' }}>
-              {filteredParcels.length}/{allParcels.length} sites 
-              {franceParcels.length > 0 && (
-                <span style={{ color: '#3b82f6' }}> (+{franceParcels.length} FR)</span>
-              )}
-              · {postes.length} postes · {landingPoints.length} LP
+            {bboxLoading && (
+              <span className="flex items-center gap-1 text-xs" style={{ color: '#3b82f6' }}>
+                <Loader size={12} className="animate-spin" />
+                Chargement parcelles...
+              </span>
+            )}
+            <span className="text-xs font-mono" style={{ color: '#8f8f9d' }} data-testid="status-bar">
+              {filteredParcels.length} sites
+              {mapZoom < MIN_ZOOM_FOR_PARCELS && ' · Zoomez (z≥14) pour voir les parcelles'}
+              {mapZoom >= MIN_ZOOM_FOR_PARCELS && ` · z${mapZoom}`}
+              {' · '}{postes.length} postes · {dcExistants.length} DC · {landingPoints.length} LP
             </span>
             {franceParcels.length > 0 && (
               <button
                 onClick={() => setFranceParcels([])}
                 className="text-xs flex items-center gap-1 hover:text-[#ff4757]"
                 style={{ color: '#8f8f9d' }}
+                data-testid="clear-parcels-btn"
               >
                 <XCircle size={12} />
-                Clear FR
+                Effacer parcelles
               </button>
             )}
           </div>
@@ -667,21 +645,19 @@ export default function Dashboard() {
             <>
               {/* Map */}
               <div className="flex-1 relative">
-                {loading ? (
-                  <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#0a0a0f' }}>
-                    <div className="loader"></div>
-                  </div>
-                ) : (
-                  <MapContainer
-                    center={[46.5, 2.5]}
-                    zoom={6}
-                    style={{ height: '100%', width: '100%' }}
-                  >
-                    <TileLayer
-                      url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    />
-                    <MapBounds parcels={filteredParcels} />
+                <MapContainer
+                  center={[46.5, 2.5]}
+                  zoom={6}
+                  style={{ height: '100%', width: '100%' }}
+                >
+                  <TileLayer
+                    url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  />
+                  <MapEventHandler 
+                    onBoundsChange={handleBoundsChange}
+                    onZoomChange={setMapZoom}
+                  />
                     
                     {/* Submarine cables */}
                     {layers.submarine_cables && submarineCables.map(cable => (
@@ -851,6 +827,27 @@ export default function Dashboard() {
                       );
                     })}
                   </MapContainer>
+                
+                {/* Zoom indicator overlay */}
+                {mapZoom < MIN_ZOOM_FOR_PARCELS && (
+                  <div 
+                    className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000] px-4 py-2 text-xs font-mono"
+                    style={{ background: 'rgba(18,18,26,0.9)', border: '1px solid #1f1f2e', color: '#ffa502' }}
+                    data-testid="zoom-indicator"
+                  >
+                    Zoomez au niveau 14+ pour afficher les parcelles cadastrales · Zoom actuel: {mapZoom}
+                  </div>
+                )}
+                
+                {/* Loading indicator for bbox */}
+                {bboxLoading && (
+                  <div 
+                    className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] px-3 py-1.5 flex items-center gap-2 text-xs font-mono"
+                    style={{ background: 'rgba(18,18,26,0.9)', border: '1px solid #3b82f6', color: '#3b82f6' }}
+                  >
+                    <Loader size={12} className="animate-spin" />
+                    Chargement des parcelles IGN...
+                  </div>
                 )}
                 
                 {/* Layer control */}
