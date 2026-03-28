@@ -1,0 +1,99 @@
+{
+  "project_name": "Cockpit Immo",
+  "app_type": "dashboard",
+  "theme": "dark",
+  "archetype": "Archetype 4 (Swiss & High-Contrast) / Terminal Hybrid",
+  "design_philosophy": "Bloomberg Terminal aesthetic: Exclusively dark mode, ultra-high data density, strictly functional, no decorative elements ('pas de déco'). Built for professionals to assess data center feasibility quickly. Desktop-first (1280px min).",
+  "typography": {
+    "font_family_headings": "JetBrains Mono",
+    "font_family_body": "IBM Plex Sans",
+    "font_family_mono": "JetBrains Mono",
+    "hierarchy": {
+      "h1": "text-2xl font-bold tracking-tight",
+      "h2": "text-xl font-semibold tracking-tight",
+      "h3": "text-lg font-medium",
+      "body": "text-sm leading-snug",
+      "data_large": "text-3xl font-mono font-bold tracking-tighter text-[#00d4aa]",
+      "data_standard": "text-sm font-mono",
+      "label": "text-xs font-mono uppercase tracking-widest text-muted-foreground"
+    },
+    "rules": [
+      "Use JetBrains Mono for ALL numbers, scores, coordinates, financial metrics, and table headers.",
+      "Never center text unless inside a specific geometric widget. Default to left-alignment for scanning.",
+      "Line heights must be tight (leading-none or leading-tight) to maximize vertical space."
+    ]
+  },
+  "colors": {
+    "background": "#0a0a0f",
+    "surface": "#12121a",
+    "surface_hover": "#1a1a24",
+    "text_primary": "#e8e8ed",
+    "text_secondary": "#8f8f9d",
+    "primary": "#00d4aa",
+    "secondary": "#3b82f6",
+    "danger": "#ff4757",
+    "warning": "#ffa502",
+    "border": "#1f1f2e",
+    "grid_line": "#1f1f2e",
+    "map_accent": "#00d4aa"
+  },
+  "layout_and_spacing": {
+    "strategy": "The 'Control Room' Grid",
+    "spacing_scale": "Extremely tight. Use p-2, p-3, p-4 maximum for panels.",
+    "borders": "1px solid #1f1f2e everywhere. Expose the skeleton.",
+    "border_radius": "rounded-none or maximum rounded-sm (2px) for interactive elements. NO soft corners.",
+    "shadows": "None. Flat UI. Use 1px borders and slight background color shifts (e.g., to #1a1a24) for elevation or hover states.",
+    "panels": "Layout should feel like a multi-pane window manager (Bloomberg terminal). Flex/Grid containers must fill viewport height (h-screen minus header)."
+  },
+  "components": {
+    "cards_and_panels": {
+      "style": "bg-[#12121a] border border-[#1f1f2e] rounded-none",
+      "header": "Border-b border-[#1f1f2e] bg-[#0a0a0f] p-2 flex items-center justify-between"
+    },
+    "buttons": {
+      "style": "h-8 px-3 text-xs font-mono uppercase tracking-wider rounded-none border transition-colors",
+      "primary": "bg-transparent border-[#00d4aa] text-[#00d4aa] hover:bg-[#00d4aa] hover:text-[#0a0a0f]",
+      "secondary": "bg-transparent border-[#1f1f2e] text-[#e8e8ed] hover:border-[#8f8f9d]",
+      "danger": "bg-transparent border-[#ff4757] text-[#ff4757] hover:bg-[#ff4757] hover:text-[#0a0a0f]"
+    },
+    "tables": {
+      "style": "w-full text-sm font-mono",
+      "header": "border-y border-[#1f1f2e] text-xs text-[#8f8f9d] uppercase tracking-wider bg-[#0a0a0f]",
+      "row": "border-b border-[#1f1f2e] hover:bg-[#12121a] transition-colors"
+    },
+    "inputs": {
+      "style": "h-8 bg-[#0a0a0f] border border-[#1f1f2e] text-sm text-[#e8e8ed] rounded-none focus:border-[#00d4aa] focus:ring-1 focus:ring-[#00d4aa]"
+    },
+    "badges": {
+      "style": "px-1.5 py-0.5 text-[10px] font-mono uppercase tracking-wider border rounded-none",
+      "success": "border-[#00d4aa] text-[#00d4aa]",
+      "warning": "border-[#ffa502] text-[#ffa502]",
+      "danger": "border-[#ff4757] text-[#ff4757]"
+    }
+  },
+  "key_features_implementation": {
+    "interactive_map": "Use Leaflet. MUST use a dark tile layer (e.g., CartoDB Dark Matter). Map should occupy at least 50% of the screen width in desktop view. Plot layers using the highly visible primary (#00d4aa) and secondary (#3b82f6) hex codes for markers and polygons.",
+    "technical_scoring": "Use dense horizontal progress bars or simple numerical readouts (e.g., '85/100'). Color-code the score: <50 danger, 50-75 warning, >75 primary green.",
+    "financial_charts": "Use Recharts for CAPEX/IRR. Remove standard Cartesian grids or make them extremely faint (#1f1f2e). Use straight lines (type='linear'), no curves. Use #00d4aa for positive cash flow, #ff4757 for costs.",
+    "crm_kanban": "Dense column layout. Cards inside columns should be extremely compact (p-2), showing only Title, Score, MW capacity, and Status badge. No avatars or decorative icons."
+  },
+  "motion_and_interactions": {
+    "hover_states": "Instant or very fast (duration-75). Bloomberg terminal users prefer speed over smooth, slow animations.",
+    "transitions": "Keep it strictly to color changes or opacity. NO bouncing, scaling, or parallax."
+  },
+  "media": {
+    "rules": "Absolutely no decorative images. The user explicitly requested 'pas de déco'.",
+    "login_background": {
+      "url": "https://images.pexels.com/photos/5203849/pexels-photo-5203849.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Optional dark server room background for the login screen. Should be heavily overlayed with bg-[#0a0a0f]/90 to remain extremely subtle."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Configure Tailwind with the exact hex codes provided in the 'colors' object. Map them to semantic names like 'dc-green' or 'infra-blue'.",
+    "Install and configure 'JetBrains Mono' for all numerical data and 'IBM Plex Sans' for standard text. Import them via Google Fonts.",
+    "Override default Shadcn components: Set all border-radius to 0 (`rounded-none`), reduce padding to make components denser (e.g., h-8 instead of h-10 for inputs).",
+    "Implement a resizable panel layout (like react-resizable-panels) if possible, to mimic a true trading/data terminal where users can adjust the map vs. data panel widths.",
+    "Ensure the application strictly enforces desktop-first styling. Hide complex data or show warning overlays on viewports below 1280px.",
+    "For the Leaflet map, disable default light mode tiles. You must use a dark theme URL (e.g., `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png`)."
+  ]
+}
