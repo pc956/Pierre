@@ -525,11 +525,15 @@ async def get_map_submarine_cables():
 
 @api_router.get("/map/electrical-assets")
 async def get_map_electrical_assets(asset_type: Optional[str] = None):
-    """Get electrical assets (postes HTB) for map - nationwide from in-memory data"""
-    postes = _FRANCE_INFRA["postes_htb"]
+    """Get electrical assets (postes HTB, lignes 400kV, lignes 225kV) for map - nationwide"""
+    all_assets = (
+        _FRANCE_INFRA["postes_htb"] +
+        _FRANCE_INFRA["lignes_400kv"] +
+        _FRANCE_INFRA["lignes_225kv"]
+    )
     if asset_type:
-        postes = [p for p in postes if p.get("type") == asset_type]
-    return {"electrical_assets": postes}
+        all_assets = [a for a in all_assets if a.get("type") == asset_type]
+    return {"electrical_assets": all_assets}
 
 
 # ═══════════════════════════════════════════════════════════

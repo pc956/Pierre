@@ -346,10 +346,161 @@ DC_EXISTANTS_FRANCE = [
 ]
 
 
+# ═══════════════════════════════════════════════════════════════════
+# LIGNES HAUTE TENSION 400kV - Corridors principaux RTE
+# Tracés simplifiés reliant les postes 400kV majeurs
+# ═══════════════════════════════════════════════════════════════════
+
+LIGNES_400KV_FRANCE = [
+    # Grand axe Nord-Sud (colonne vertébrale)
+    {"asset_id": "l400_ns1", "nom": "400kV Lille-Paris Nord", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[3.08, 50.58], [2.83, 50.43], [2.30, 49.89], [2.45, 49.42], [2.45, 48.98]]}},
+    {"asset_id": "l400_ns2", "nom": "400kV Paris-Lyon", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[2.36, 48.94], [2.44, 48.63], [2.66, 48.54], [3.09, 47.90], [4.07, 48.30], [4.85, 46.78], [4.88, 45.69], [4.95, 45.74]]}},
+    {"asset_id": "l400_ns3", "nom": "400kV Lyon-Marseille", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[4.95, 45.74], [4.89, 44.93], [4.81, 43.95], [5.25, 43.46], [5.38, 43.35]]}},
+
+    # Axe Est
+    {"asset_id": "l400_e1", "nom": "400kV Paris-Strasbourg", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[2.45, 48.98], [4.03, 49.25], [6.18, 49.12], [7.75, 48.58]]}},
+    {"asset_id": "l400_e2", "nom": "400kV Strasbourg-Lyon", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[7.75, 48.58], [7.34, 47.75], [6.86, 47.64], [6.02, 47.24], [5.04, 47.32], [4.95, 45.74]]}},
+
+    # Axe Ouest
+    {"asset_id": "l400_w1", "nom": "400kV Paris-Nantes", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[2.36, 48.94], [2.06, 49.04], [1.91, 47.90], [0.69, 47.39], [0.20, 48.00], [-0.55, 47.47], [-1.55, 47.22]]}},
+    {"asset_id": "l400_w2", "nom": "400kV Nantes-Bordeaux", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[-1.55, 47.22], [-1.43, 46.67], [-1.15, 46.16], [-0.58, 44.87]]}},
+
+    # Axe Nord-Ouest
+    {"asset_id": "l400_nw1", "nom": "400kV Paris-Rouen-Le Havre", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[2.36, 48.94], [2.13, 48.80], [1.15, 49.02], [1.09, 49.44], [0.12, 49.49]]}},
+    {"asset_id": "l400_nw2", "nom": "400kV Rouen-Rennes", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[1.09, 49.44], [-0.37, 49.18], [-1.62, 49.64], [-1.68, 48.11]]}},
+    {"asset_id": "l400_nw3", "nom": "400kV Rennes-Brest", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[-1.68, 48.11], [-2.76, 48.51], [-4.10, 47.99], [-4.49, 48.39]]}},
+
+    # Axe Sud
+    {"asset_id": "l400_s1", "nom": "400kV Bordeaux-Toulouse", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[-0.58, 44.87], [0.62, 44.20], [1.40, 43.64]]}},
+    {"asset_id": "l400_s2", "nom": "400kV Toulouse-Marseille", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[1.40, 43.64], [2.35, 43.21], [3.22, 43.34], [3.87, 43.61], [4.36, 43.84], [4.81, 43.95], [4.95, 43.45], [5.38, 43.35]]}},
+
+    # Interconnexions
+    {"asset_id": "l400_ic1", "nom": "400kV Dunkerque-Lille", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[2.38, 51.03], [2.83, 50.43], [3.08, 50.58]]}},
+    {"asset_id": "l400_ic2", "nom": "400kV Lyon-Grenoble", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[4.95, 45.74], [5.72, 45.19]]}},
+    {"asset_id": "l400_ic3", "nom": "400kV Nice-Marseille", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[5.38, 43.35], [5.93, 43.12], [7.01, 43.55], [7.26, 43.70]]}},
+    {"asset_id": "l400_ic4", "nom": "400kV Dijon-Orléans", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[5.04, 47.32], [3.57, 47.80], [2.40, 47.08], [1.91, 47.90]]}},
+    {"asset_id": "l400_ic5", "nom": "400kV Metz-Strasbourg", "type": "ligne_400kv", "tension_kv": 400,
+     "geometry": {"type": "LineString", "coordinates": [[6.18, 49.12], [6.18, 48.69], [7.75, 48.58]]}},
+]
+
+# ═══════════════════════════════════════════════════════════════════
+# LIGNES HAUTE TENSION 225kV - Réseau de répartition
+# Tracés simplifiés reliant les postes 225kV entre eux et aux 400kV
+# ═══════════════════════════════════════════════════════════════════
+
+LIGNES_225KV_FRANCE = [
+    # IDF maillage dense
+    {"asset_id": "l225_idf1", "nom": "225kV IDF Nord - Villepinte-Gonesse", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[2.55, 48.96], [2.52, 49.01], [2.45, 48.98], [2.39, 48.92]]}},
+    {"asset_id": "l225_idf2", "nom": "225kV IDF Est - Croissy-MlV", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[2.65, 48.82], [2.78, 48.85], [2.88, 48.95]]}},
+    {"asset_id": "l225_idf3", "nom": "225kV IDF Ouest - Nanterre-Versailles", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[2.21, 48.89], [2.29, 48.93], [2.36, 48.94], [2.39, 48.79]]}},
+    {"asset_id": "l225_idf4", "nom": "225kV IDF Sud - Vitry-Évry", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[2.39, 48.79], [2.44, 48.63], [2.66, 48.54]]}},
+    {"asset_id": "l225_idf5", "nom": "225kV IDF Tremblay-La Courneuve", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[2.57, 48.95], [2.45, 48.98], [2.39, 48.92], [2.36, 48.94]]}},
+
+    # PACA
+    {"asset_id": "l225_paca1", "nom": "225kV Marseille-Vitrolles-Aix", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[5.38, 43.35], [5.21, 43.42], [5.25, 43.46], [5.45, 43.52]]}},
+    {"asset_id": "l225_paca2", "nom": "225kV Fos-Istres-Marignane", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[4.95, 43.45], [4.98, 43.51], [5.21, 43.42]]}},
+    {"asset_id": "l225_paca3", "nom": "225kV Nice-Toulon", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[7.26, 43.70], [7.01, 43.55], [5.93, 43.12]]}},
+
+    # Auvergne-Rhône-Alpes
+    {"asset_id": "l225_aura1", "nom": "225kV Lyon-St Priest-Vénissieux", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[4.95, 45.74], [4.94, 45.70], [4.88, 45.69]]}},
+    {"asset_id": "l225_aura2", "nom": "225kV Lyon-St Étienne", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[4.88, 45.69], [4.39, 45.44]]}},
+    {"asset_id": "l225_aura3", "nom": "225kV Grenoble-Chambéry-Annecy", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[5.72, 45.19], [5.92, 45.57], [6.13, 45.90]]}},
+    {"asset_id": "l225_aura4", "nom": "225kV Lyon-Valence", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[4.88, 45.69], [4.89, 44.93]]}},
+    {"asset_id": "l225_aura5", "nom": "225kV Clermont-Lyon", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[3.09, 45.78], [4.39, 45.44], [4.88, 45.69]]}},
+
+    # Hauts-de-France
+    {"asset_id": "l225_hdf1", "nom": "225kV Lille-Roubaix-Valenciennes", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[3.08, 50.58], [3.18, 50.69], [3.52, 50.36]]}},
+    {"asset_id": "l225_hdf2", "nom": "225kV Calais-Dunkerque", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[1.88, 50.94], [2.38, 51.03]]}},
+    {"asset_id": "l225_hdf3", "nom": "225kV Douai-Amiens-Compiègne", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[3.08, 50.37], [2.30, 49.89], [2.83, 49.42]]}},
+
+    # Occitanie
+    {"asset_id": "l225_occ1", "nom": "225kV Toulouse-Montpellier", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[1.40, 43.64], [2.35, 43.21], [3.22, 43.34], [3.87, 43.61]]}},
+    {"asset_id": "l225_occ2", "nom": "225kV Montpellier-Nîmes-Avignon", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[3.87, 43.61], [4.36, 43.84], [4.81, 43.95]]}},
+    {"asset_id": "l225_occ3", "nom": "225kV Perpignan-Béziers", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[2.89, 42.70], [3.22, 43.34]]}},
+
+    # Nouvelle-Aquitaine
+    {"asset_id": "l225_naq1", "nom": "225kV Bordeaux-La Rochelle-Poitiers", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[-0.58, 44.87], [-1.15, 46.16], [0.34, 46.58]]}},
+    {"asset_id": "l225_naq2", "nom": "225kV Bordeaux-Bayonne-Pau", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[-0.58, 44.87], [-1.47, 43.49], [-0.37, 43.30]]}},
+    {"asset_id": "l225_naq3", "nom": "225kV Poitiers-Limoges", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[0.34, 46.58], [1.26, 45.83]]}},
+
+    # Grand Est
+    {"asset_id": "l225_ges1", "nom": "225kV Nancy-Metz-Reims", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[6.18, 48.69], [6.18, 49.12], [4.03, 49.25]]}},
+    {"asset_id": "l225_ges2", "nom": "225kV Strasbourg-Mulhouse", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[7.75, 48.58], [7.36, 48.08], [7.34, 47.75]]}},
+    {"asset_id": "l225_ges3", "nom": "225kV Reims-Troyes", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[4.03, 49.25], [4.07, 48.30]]}},
+
+    # Normandie
+    {"asset_id": "l225_nor1", "nom": "225kV Caen-Cherbourg", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[-0.37, 49.18], [-1.62, 49.64]]}},
+
+    # Bretagne
+    {"asset_id": "l225_bzh1", "nom": "225kV Rennes-Lorient-Quimper", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[-1.68, 48.11], [-2.76, 47.66], [-3.37, 47.75], [-4.10, 47.99]]}},
+    {"asset_id": "l225_bzh2", "nom": "225kV Rennes-Brest", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[-1.68, 48.11], [-2.76, 48.51], [-4.49, 48.39]]}},
+
+    # Pays de la Loire
+    {"asset_id": "l225_pdl1", "nom": "225kV Nantes-Angers-Le Mans", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[-1.55, 47.22], [-0.55, 47.47], [0.20, 48.00]]}},
+    {"asset_id": "l225_pdl2", "nom": "225kV Nantes-St Nazaire", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[-1.55, 47.22], [-2.21, 47.28]]}},
+
+    # Centre-Val de Loire
+    {"asset_id": "l225_cvl1", "nom": "225kV Orléans-Tours-Bourges", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[1.91, 47.90], [0.69, 47.39], [2.40, 47.08]]}},
+
+    # Bourgogne-Franche-Comté
+    {"asset_id": "l225_bfc1", "nom": "225kV Dijon-Besançon-Belfort", "type": "ligne_225kv", "tension_kv": 225,
+     "geometry": {"type": "LineString", "coordinates": [[5.04, 47.32], [6.02, 47.24], [6.86, 47.64]]}},
+]
+
+
 def get_all_france_infra():
     """Get all France infrastructure data"""
     return {
         "postes_htb": POSTES_HTB_FRANCE,
+        "lignes_400kv": LIGNES_400KV_FRANCE,
+        "lignes_225kv": LIGNES_225KV_FRANCE,
         "submarine_cables": SUBMARINE_CABLES_FRANCE,
         "landing_points": LANDING_POINTS_FRANCE,
         "dc_existants": DC_EXISTANTS_FRANCE,
