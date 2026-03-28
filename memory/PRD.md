@@ -4,91 +4,79 @@
 
 ## Original Problem Statement
 Plateforme de prospection foncière pour data centers en France - "Cockpit Immo"
-- MVP complet avec Google OAuth
-- Priorité: Module de scoring
+- MVP complet avec Google OAuth, scoring engine, carte interactive
 - Dark mode exclusif (Bloomberg terminal aesthetic)
+- API pour agents IA conversationnels
 
 ## What's Been Implemented
 
-### Phase 1 - MVP (2026-03-28)
+### Phase 1 - MVP
 - Backend FastAPI avec MongoDB
 - Scoring engine complet (6 critères + malus + urbanisme + raccordement)
 - Frontend React avec Leaflet dark mode
 - Google OAuth via Emergent Auth
 - Filtres avancés (distance RTE, distance landing, surface, PLU)
-- Modal SIREN/Pappers info
 
-### Phase 2 - Données Nationales France (2026-03-28)
+### Phase 2 - Données Nationales France
 - 101 postes HTB + 17 lignes 400kV + 32 lignes 225kV
 - 61 DC existants, 15 câbles sous-marins, 8 landing points
-- Chargement dynamique des parcelles par BBox (API Carto IGN) au zoom >= 14
+- Chargement dynamique des parcelles par BBox (API Carto IGN)
 - Recherche de communes avec flyTo automatique
-- Calcul distances réelles via haversine
 
-### Bug Fix - Parcelles Cliquables (2026-03-28)
-- Root cause 1: parcel_id dupliqué (fr_) -> corrigé avec idu de l'API Carto
-- Root cause 2: Filtres de distance trop restrictifs -> augmentés à 100km/1000km
-- Root cause 3: CircleMarker -> LeafletPolygon avec contours cyan visibles
-- Ajout FlyToParcels component pour recentrage automatique
+### Phase 3 - Intégration S3REnR
+- Données S3REnR: IDF (10 postes, SATURÉ), PACA (76 postes, ACTIF), HdF (66 postes, ACTIF)
+- Enrichissement postes HTB avec MW dispo, état, renforcements, score DC
+- Panneau régional S3REnR dans la sidebar + légende
 
-### Phase 3 - Intégration S3REnR (2026-03-28)
-- Données S3REnR pour 3 régions: IDF (10 postes, SATURÉ), PACA (76 postes, ACTIF), HdF (66 postes, ACTIF)
-- Backend: enrichissement des postes HTB avec données S3REnR (MW dispo, état, renforcements, score DC)
-- Backend: `/api/s3renr/summary` et `/api/s3renr/top-opportunities` endpoints
-- Frontend: code couleur des postes HTB (vert=disponible, orange=contraint, rouge=saturé)
-- Frontend: popups enrichis avec barres de progression MW, score DC, plan de renforcement
-- Frontend: panneau régional S3REnR dans la sidebar
-- Labels MW sur la carte pour les postes avec correspondance directe
-- Testing: 19/19 tests passés
+### Phase 4 - Responsive Mobile + PLU Réel GPU
+- App fonctionne sur téléphone (carte plein écran, navigation mobile, bottom sheets)
+- PLU réel via GPU API (U/AU/A/N avec libellé)
 
-### Phase 4 - Responsive Mobile + PLU Réel GPU (2026-03-28)
-**Responsive Mobile:**
-- Suppression du blocage CSS desktop-only, l'app fonctionne sur mobile
-- Header compact avec boutons filtre/couches
-- Carte plein écran sur mobile
-- Barre de navigation mobile en bas (Carte/Tableau/CRM/Stats)
-- Filtres en bottom sheet glissant depuis le bas
-- Couches en bottom sheet avec grille 2 colonnes
-- Sidebar transformée en panneau fixe glissant sur mobile
-- Popups Leaflet adaptés pour écrans tactiles
-- Contrôle COUCHES desktop caché sur mobile (remplacé par bottom sheet)
+### Phase 5 - DC Search API pour Agents IA (2026-03-28)
+**POST /api/dc/search** — Recherche principale
+- Input: mw_target, mw_min, max_delay_months, surface_min_ha, region, strategy, grid_priority, brownfield_only, pagination
+- Output: sites scorés/triés avec score (global/power/speed/cost/risk), tags, comment AI
+- 101 sites générés à partir des postes HTB + enrichissement S3REnR
+- Scoring dynamique avec 4 stratégies: speed, cost, power, balanced
+- Aliases régions (IDF, ile-de-france, paris, PACA, provence, etc.)
+- Pagination (page, per_page, total_pages)
 
-**PLU Réel via GPU API:**
-- Intégration de l'API GPU (Géoportail de l'Urbanisme) dans `api_carto.py`
-- Récupération en parallèle des zones PLU lors du chargement des parcelles par BBox
-- Zones PLU réelles: U (Urbain), AU (À Urbaniser), A (Agricole), N (Naturelle)
-- Code couleur PLU dans le tableau (vert=U, orange=AU, violet=A, bleu=N)
-- Affichage enrichi dans la fiche parcelle: zone PLU + libellé + description longue
-- Filtrage par zone PLU fonctionnel avec données réelles
-- Testing: 100% tests passés (12 backend + toutes vérifications frontend)
+**GET /api/dc/site/:id** — Fiche site complète
+- Données grid détaillées (S3REnR, renforcement, délais)
+- Connectivité (distance landing point, DC existant le plus proche)
+- Score multi-critères
+
+**Logique métier:**
+- Bonus: renforcement S3REnR prévu, proximité 225kV/400kV
+- Malus: saturation réseau, délai > objectif
+- IDF correctement marqué SATURÉ (score power ~0)
+- Calais (28MW) et Valenciennes (65MW) avec données S3REnR réelles
+- Testing: 26/26 tests passés
 
 ## Architecture
 ```
 Frontend (React 18 + Tailwind + Leaflet) -> REST API -> Backend (FastAPI)
                                                         |
                                                 MongoDB + API Carto IGN + GPU API
-                                                + france_infra_data.py (in-memory)
-                                                + s3renr_data.py (in-memory)
+                                                + france_infra_data.py (101 postes HTB)
+                                                + s3renr_data.py (152 postes S3REnR)
+                                                + dc_search_api.py (AI search engine)
 ```
 
 ## Key API Endpoints
-- `GET /api/map/electrical-assets` - Postes HTB enrichis S3REnR + lignes
-- `GET /api/s3renr/summary` - Résumé par région (MW, postes, statuts)
-- `GET /api/s3renr/top-opportunities` - Top opportunités DC par MW dispo
-- `GET /api/france/parcelles/bbox` - Parcelles par BBox + PLU GPU
-- `GET /api/france/communes` - Recherche communes
+- `POST /api/dc/search` — AI Agent DC search
+- `GET /api/dc/site/:id` — AI Agent site detail
+- `GET /api/map/electrical-assets` — Postes HTB enrichis S3REnR
+- `GET /api/s3renr/summary` — Résumé S3REnR par région
+- `GET /api/france/parcelles/bbox` — Parcelles par BBox + PLU GPU
 
 ## Prioritized Backlog
 
 ### P0 - Core (Done)
-- [x] Scoring engine
-- [x] Carte interactive avec polygones cadastraux cliquables
-- [x] Google OAuth
-- [x] Données nationales France (101 postes, lignes, DC, câbles)
-- [x] Lignes 400kV et 225kV
-- [x] Intégration S3REnR (capacités MW, saturation, renforcements)
-- [x] Responsive mobile
-- [x] PLU réel via GPU API
+- [x] Scoring engine + carte interactive + Google OAuth
+- [x] Données nationales France + S3REnR
+- [x] Responsive mobile + PLU réel GPU
+- [x] DC Search API pour agents IA
 
 ### P1 - Next Sprint
 - [ ] CRM Kanban drag & drop
@@ -96,7 +84,7 @@ Frontend (React 18 + Tailwind + Leaflet) -> REST API -> Backend (FastAPI)
 - [ ] Export PDF fiches sites
 
 ### P2 - Future
-- [ ] Couches risques environnementaux (inondation, sismique)
-- [ ] Comparaison côte-à-côte (4 parcelles)
+- [ ] Couches risques environnementaux
+- [ ] Comparaison côte-à-côte
 - [ ] Mode COMEX
 - [ ] Alertes automatiques
