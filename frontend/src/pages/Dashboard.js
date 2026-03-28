@@ -767,6 +767,52 @@ function ParcelDetail({ parcel, projectType, onClose }) {
           </div>
         </div>
 
+        {/* Propriétaire & Foncier */}
+        <div className="panel p-3">
+          <p className="text-xs font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>Propriétaire & Foncier</p>
+          <div className="space-y-2">
+            <div>
+              <p className="text-sm font-bold" style={{ color: '#e8e8ed' }}>
+                {parcel.proprietaire_nom || 'Propriétaire inconnu'}
+              </p>
+              <p className="text-xs" style={{ color: '#8f8f9d' }}>
+                {parcel.proprietaire_type === 'sci' ? 'SCI / Société civile' : 
+                 parcel.proprietaire_type === 'fonciere' ? 'Foncière / Investisseur' :
+                 parcel.proprietaire_type === 'prive' ? 'Propriétaire privé' : 
+                 'Type inconnu'}
+              </p>
+            </div>
+            <div className="flex justify-between text-xs pt-2" style={{ borderTop: '1px solid #1f1f2e' }}>
+              <span style={{ color: '#8f8f9d' }}>Réf. cadastrale</span>
+              <span className="font-mono" style={{ color: '#e8e8ed' }}>
+                {parcel.ref_cadastrale || '-'}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span style={{ color: '#8f8f9d' }}>Prix DVF (€/m²)</span>
+              <span className="font-mono" style={{ color: '#ffa502' }}>
+                {parcel.dvf_prix_m2_p50 ? `${parcel.dvf_prix_m2_p50.toFixed(0)} €` : '-'}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span style={{ color: '#8f8f9d' }}>Transactions DVF</span>
+              <span className="font-mono" style={{ color: '#8f8f9d' }}>
+                {parcel.dvf_nb_transactions || 0} dans le secteur
+              </span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span style={{ color: '#8f8f9d' }}>Type de site</span>
+              <span className={`badge ${
+                parcel.site_type === 'zac' ? 'badge-success' :
+                parcel.site_type === 'friche_industrielle' ? 'badge-info' :
+                parcel.site_type === 'brownfield' ? 'badge-warning' : ''
+              }`}>
+                {parcel.site_type?.replace('_', ' ') || 'greenfield'}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Infrastructure */}
         <div className="panel p-3">
           <p className="text-xs font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>Infrastructure</p>
@@ -775,6 +821,22 @@ function ParcelDetail({ parcel, projectType, onClose }) {
               <span style={{ color: '#8f8f9d' }}>Poste HTB</span>
               <span className="font-mono" style={{ color: '#e8e8ed' }}>
                 {parcel.dist_poste_htb_m ? `${(parcel.dist_poste_htb_m/1000).toFixed(1)} km` : '-'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span style={{ color: '#8f8f9d' }}>Tension HTB</span>
+              <span className="font-mono" style={{ color: parcel.tension_htb_kv >= 225 ? '#00d4aa' : '#ffa502' }}>
+                {parcel.tension_htb_kv ? `${parcel.tension_htb_kv} kV` : '-'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span style={{ color: '#8f8f9d' }}>Zone saturation</span>
+              <span className={`badge ${
+                parcel.zone_saturation === 'disponible' ? 'badge-success' :
+                parcel.zone_saturation === 'tendu' ? 'badge-warning' :
+                parcel.zone_saturation === 'sature' ? 'badge-danger' : ''
+              }`}>
+                {parcel.zone_saturation || 'inconnu'}
               </span>
             </div>
             <div className="flex justify-between">
