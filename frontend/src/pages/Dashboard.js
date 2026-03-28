@@ -6,7 +6,7 @@ import {
   Server, Map as MapIcon, Table, Briefcase, Bell, Settings, LogOut, 
   Search, Filter, ChevronDown, Plus, Zap, Wifi, Droplets, Square,
   TrendingUp, Clock, AlertTriangle, CheckCircle, XCircle, RefreshCw,
-  Layers, Eye, EyeOff, Anchor, Cable
+  Layers, Eye, EyeOff, Anchor, Cable, Building2, ExternalLink, X
 } from 'lucide-react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap, Marker, Polyline } from 'react-leaflet';
 import L from 'leaflet';
@@ -121,6 +121,9 @@ export default function Dashboard() {
     submarine_cables: true,
     dc_existants: true,
   });
+  
+  // SIREN modal
+  const [sirenModal, setSirenModal] = useState(null);
 
   // Fetch parcels
   useEffect(() => {
@@ -612,7 +615,12 @@ export default function Dashboard() {
                 style={{ background: '#12121a', borderLeft: '1px solid #1f1f2e' }}
               >
                 {selectedParcel ? (
-                  <ParcelDetail parcel={selectedParcel} projectType={projectType} onClose={() => setSelectedParcel(null)} />
+                  <ParcelDetail 
+                    parcel={selectedParcel} 
+                    projectType={projectType} 
+                    onClose={() => setSelectedParcel(null)}
+                    onShowSiren={(p) => setSirenModal(p)}
+                  />
                 ) : (
                   <div className="p-4">
                     <h3 className="text-sm font-mono uppercase mb-4" style={{ color: '#8f8f9d' }}>
@@ -690,6 +698,148 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      
+      {/* SIREN Modal */}
+      {sirenModal && sirenModal.proprietaire_siren && (
+        <SirenModal 
+          parcel={sirenModal} 
+          onClose={() => setSirenModal(null)} 
+        />
+      )}
+    </div>
+  );
+}
+
+// SIREN Modal Component
+function SirenModal({ parcel, onClose }) {
+  const siren = parcel.proprietaire_siren;
+  
+  if (!siren) return null;
+  
+  return (
+    <div 
+      className="fixed inset-0 z-[2000] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.8)' }}
+      onClick={onClose}
+    >
+      <div 
+        className="w-full max-w-lg"
+        style={{ background: '#12121a', border: '1px solid #1f1f2e' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div 
+          className="flex items-center justify-between p-4"
+          style={{ borderBottom: '1px solid #1f1f2e' }}
+        >
+          <div className="flex items-center gap-3">
+            <Building2 size={20} style={{ color: '#3b82f6' }} />
+            <div>
+              <h3 className="font-bold" style={{ color: '#e8e8ed' }}>
+                {siren.raison_sociale}
+              </h3>
+              <p className="text-xs" style={{ color: '#8f8f9d' }}>
+                Fiche entreprise
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose}
+            className="text-[#8f8f9d] hover:text-[#e8e8ed]"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        
+        {/* Content */}
+        <div className="p-4 space-y-4">
+          {/* Identifiants */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="panel p-3">
+              <p className="text-xs font-mono uppercase mb-1" style={{ color: '#8f8f9d' }}>SIREN</p>
+              <p className="text-lg font-mono font-bold" style={{ color: '#00d4aa' }}>
+                {siren.siren}
+              </p>
+            </div>
+            <div className="panel p-3">
+              <p className="text-xs font-mono uppercase mb-1" style={{ color: '#8f8f9d' }}>SIRET (siège)</p>
+              <p className="text-lg font-mono font-bold" style={{ color: '#e8e8ed' }}>
+                {siren.siret}
+              </p>
+            </div>
+          </div>
+          
+          {/* Infos société */}
+          <div className="panel p-3 space-y-2">
+            <div className="flex justify-between text-xs">
+              <span style={{ color: '#8f8f9d' }}>Forme juridique</span>
+              <span className="font-mono badge badge-info">{siren.forme_juridique}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span style={{ color: '#8f8f9d' }}>Capital social</span>
+              <span className="font-mono" style={{ color: '#e8e8ed' }}>
+                {(siren.capital / 1000000).toFixed(0)} M€
+              </span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span style={{ color: '#8f8f9d' }}>Date création</span>
+              <span className="font-mono" style={{ color: '#e8e8ed' }}>
+                {siren.date_creation}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span style={{ color: '#8f8f9d' }}>Effectif</span>
+              <span className="font-mono" style={{ color: '#e8e8ed' }}>
+                {siren.effectif}
+              </span>
+            </div>
+          </div>
+          
+          {/* Activité */}
+          <div className="panel p-3 space-y-2">
+            <div className="flex justify-between text-xs">
+              <span style={{ color: '#8f8f9d' }}>Code NAF</span>
+              <span className="font-mono" style={{ color: '#3b82f6' }}>
+                {siren.code_naf}
+              </span>
+            </div>
+            <div className="text-xs">
+              <span style={{ color: '#8f8f9d' }}>Activité: </span>
+              <span style={{ color: '#e8e8ed' }}>{siren.activite}</span>
+            </div>
+          </div>
+          
+          {/* Adresse */}
+          <div className="panel p-3">
+            <p className="text-xs font-mono uppercase mb-1" style={{ color: '#8f8f9d' }}>Adresse siège</p>
+            <p className="text-sm" style={{ color: '#e8e8ed' }}>
+              {siren.adresse}
+            </p>
+          </div>
+          
+          {/* Parcelle concernée */}
+          <div 
+            className="p-3 flex items-center justify-between"
+            style={{ background: '#0a0a0f' }}
+          >
+            <div>
+              <p className="text-xs" style={{ color: '#8f8f9d' }}>Parcelle concernée</p>
+              <p className="font-mono text-sm" style={{ color: '#e8e8ed' }}>
+                {parcel.ref_cadastrale} · {parcel.commune}
+              </p>
+            </div>
+            <a
+              href={`https://www.pappers.fr/entreprise/${siren.siren}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary flex items-center gap-1"
+            >
+              Voir sur Pappers
+              <ExternalLink size={12} />
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -714,7 +864,7 @@ function LayerToggle({ label, color, icon, active, onClick }) {
 }
 
 // Parcel Detail Panel
-function ParcelDetail({ parcel, projectType, onClose }) {
+function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
   const score = parcel.score || {};
   
   return (
@@ -772,7 +922,8 @@ function ParcelDetail({ parcel, projectType, onClose }) {
           <p className="text-xs font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>Propriétaire & Foncier</p>
           <div className="space-y-2">
             <div>
-              <p className="text-sm font-bold" style={{ color: '#e8e8ed' }}>
+              <p className="text-sm font-bold flex items-center gap-2" style={{ color: '#e8e8ed' }}>
+                <Building2 size={14} style={{ color: '#3b82f6' }} />
                 {parcel.proprietaire_nom || 'Propriétaire inconnu'}
               </p>
               <p className="text-xs" style={{ color: '#8f8f9d' }}>
@@ -782,12 +933,38 @@ function ParcelDetail({ parcel, projectType, onClose }) {
                  'Type inconnu'}
               </p>
             </div>
-            <div className="flex justify-between text-xs pt-2" style={{ borderTop: '1px solid #1f1f2e' }}>
+            <div className="flex justify-between items-center text-xs pt-2" style={{ borderTop: '1px solid #1f1f2e' }}>
               <span style={{ color: '#8f8f9d' }}>Réf. cadastrale</span>
-              <span className="font-mono" style={{ color: '#e8e8ed' }}>
-                {parcel.ref_cadastrale || '-'}
-              </span>
+              {parcel.proprietaire_siren ? (
+                <button
+                  onClick={() => onShowSiren && onShowSiren(parcel)}
+                  className="font-mono flex items-center gap-1 hover:underline"
+                  style={{ color: '#3b82f6' }}
+                  data-testid="ref-cadastrale-btn"
+                >
+                  {parcel.ref_cadastrale || '-'}
+                  <ExternalLink size={10} />
+                </button>
+              ) : (
+                <span className="font-mono" style={{ color: '#e8e8ed' }}>
+                  {parcel.ref_cadastrale || '-'}
+                </span>
+              )}
             </div>
+            {parcel.proprietaire_siren && (
+              <div className="flex justify-between text-xs">
+                <span style={{ color: '#8f8f9d' }}>SIREN</span>
+                <button
+                  onClick={() => onShowSiren && onShowSiren(parcel)}
+                  className="font-mono flex items-center gap-1 hover:underline"
+                  style={{ color: '#00d4aa' }}
+                  data-testid="siren-btn"
+                >
+                  {parcel.proprietaire_siren.siren}
+                  <ExternalLink size={10} />
+                </button>
+              </div>
+            )}
             <div className="flex justify-between text-xs">
               <span style={{ color: '#8f8f9d' }}>Prix DVF (€/m²)</span>
               <span className="font-mono" style={{ color: '#ffa502' }}>

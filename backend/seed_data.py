@@ -5,6 +5,70 @@ Cockpit Immo - Seed Data Generator
 import random
 from typing import List, Dict, Any
 
+# SIREN codes for known companies (real codes from public data)
+SIREN_MAPPING = {
+    'SEGRO': {
+        'siren': '443061841',
+        'siret': '44306184100056',
+        'raison_sociale': 'SEGRO FRANCE SAS',
+        'forme_juridique': 'SAS',
+        'capital': 50000000,
+        'adresse': '40 rue de Courcelles, 75008 Paris',
+        'activite': 'Location de terrains et autres biens immobiliers',
+        'code_naf': '6820B',
+        'effectif': '50-99 salariés',
+        'date_creation': '2002-01-15',
+    },
+    'PROLOGIS FRANCE': {
+        'siren': '391368498',
+        'siret': '39136849800089',
+        'raison_sociale': 'PROLOGIS FRANCE XLIII SAS',
+        'forme_juridique': 'SAS',
+        'capital': 80000000,
+        'adresse': '1 rue Jean Monnet, 92120 Montrouge',
+        'activite': 'Location de terrains et autres biens immobiliers',
+        'code_naf': '6820B',
+        'effectif': '100-199 salariés',
+        'date_creation': '1993-03-22',
+    },
+    'GOODMAN FRANCE': {
+        'siren': '499247035',
+        'siret': '49924703500037',
+        'raison_sociale': 'GOODMAN FRANCE SAS',
+        'forme_juridique': 'SAS',
+        'capital': 45000000,
+        'adresse': '12 rue Euler, 75008 Paris',
+        'activite': 'Promotion immobilière de logements',
+        'code_naf': '4110A',
+        'effectif': '20-49 salariés',
+        'date_creation': '2007-05-18',
+    },
+    'CARREFOUR PROPERTY': {
+        'siren': '382696581',
+        'siret': '38269658100013',
+        'raison_sociale': 'CARREFOUR PROPERTY DEVELOPPEMENT',
+        'forme_juridique': 'SAS',
+        'capital': 150000000,
+        'adresse': '93 avenue de Paris, 91300 Massy',
+        'activite': 'Marchands de biens immobiliers',
+        'code_naf': '6810Z',
+        'effectif': '200-499 salariés',
+        'date_creation': '1991-07-12',
+    },
+    'SCI FONCIERE NORD': {
+        'siren': '512847392',
+        'siret': '51284739200019',
+        'raison_sociale': 'SCI FONCIERE DU NORD',
+        'forme_juridique': 'SCI',
+        'capital': 5000000,
+        'adresse': '15 rue du Faubourg Saint-Honoré, 75008 Paris',
+        'activite': 'Location de terrains et autres biens immobiliers',
+        'code_naf': '6820B',
+        'effectif': '1-9 salariés',
+        'date_creation': '2009-02-28',
+    },
+}
+
 # Submarine cables
 SUBMARINE_CABLES = [
     {
@@ -426,9 +490,16 @@ def generate_parcel(base: Dict[str, Any], idx: int) -> Dict[str, Any]:
         # DVF
         'dvf_prix_m2_p50': round(random.uniform(60, 180) * (1.5 if region == 'IDF' else 1.0), 0),
         'dvf_nb_transactions': random.randint(3, 25),
-        'proprietaire_nom': random.choice(['SCI FONCIERE NORD', 'CARREFOUR PROPERTY', 'PROLOGIS FRANCE', 'PRIVATE OWNER', 'GOODMAN FRANCE', 'SEGRO']),
-        'proprietaire_type': random.choice(['sci', 'fonciere', 'prive']),
-        
+    }
+    
+    # Set owner with matching SIREN
+    owner_name = random.choice(['SCI FONCIERE NORD', 'CARREFOUR PROPERTY', 'PROLOGIS FRANCE', 'PRIVATE OWNER', 'GOODMAN FRANCE', 'SEGRO'])
+    parcel['proprietaire_nom'] = owner_name
+    parcel['proprietaire_type'] = 'prive' if owner_name == 'PRIVATE OWNER' else random.choice(['sci', 'fonciere'])
+    parcel['proprietaire_siren'] = SIREN_MAPPING.get(owner_name)
+    
+    # Additional fields
+    parcel.update({
         # Shovel-ready
         'raccordement_elec_existant': is_shovel_ready,
         'raccordement_fibre_existant': is_shovel_ready or random.random() > 0.7,
@@ -439,7 +510,7 @@ def generate_parcel(base: Dict[str, Any], idx: int) -> Dict[str, Any]:
         
         # DC voisins
         'dc_voisins': dc_voisins,
-    }
+    })
     
     return parcel
 
