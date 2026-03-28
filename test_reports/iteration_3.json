@@ -1,0 +1,53 @@
+{
+  "summary": "Parcel click bug fix verified. All 9 backend tests passed. Frontend testing confirms: parcels render as polygon shapes (not circles), clicking parcels opens detail panel with score/surface/infrastructure info, no duplicate key React errors, BBox dynamic loading works (207 sites loaded), map flies to parcels on commune search.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "Backend: /api/france/parcelles/bbox returns parcels with unique IDs (50 parcels, 0 duplicates)",
+    "Backend: /api/france/parcelles/commune/93078 returns parcels with unique IDs (8 parcels for Villepinte)",
+    "Backend: Parcel IDs use fr_ prefix with idu field (e.g., fr_93078000BA0187)",
+    "Backend: Parcels have geometry field with Polygon/MultiPolygon type",
+    "Backend: Parcels have score with verdict (GO/CONDITIONNEL/NO_GO)",
+    "Backend: Parcels have infrastructure distances (dist_poste_htb_m, dist_landing_point_km)",
+    "Backend: Commune search returns correct results for Villepinte (code 93078)",
+    "Backend: BBox endpoint respects limit parameter",
+    "Backend: BBox endpoint returns count field",
+    "Frontend: Searching Villepinte loads parcels AND map flies to their location",
+    "Frontend: At zoom >= 14, bbox dynamic loading fetches MORE parcels (207 sites loaded)",
+    "Frontend: Parcels render as visible polygon shapes (cyan/teal outlines) on dark map",
+    "Frontend: Clicking a parcel polygon opens the detail panel on the right",
+    "Frontend: Parcel detail panel shows score (53/100), surface (0.5 ha), infrastructure distances (HTB 0.5km, LP 152km), owner info",
+    "Frontend: No duplicate key React errors in console (0 errors)",
+    "Frontend: Status bar shows correct parcel count (207 sites)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_parcel_bug_fix.py",
+    "/app/test_reports/pytest/pytest_results_iteration3.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_parcel_bug_fix.py"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 tests passed)",
+    "frontend": "100% (All parcel click features working)"
+  },
+  "test_credentials": "Auth bypass: Cookie session_token=test_session_token_2026",
+  "seed_data_creation": "No seed data - parcels fetched from API Carto IGN",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Parcel click bug is FIXED. Key changes verified: 1) parcel_id uses idu field from API Carto (fr_93078000BA0187 format), 2) Parcels render as LeafletPolygon with cyan outlines, 3) FlyToParcels component centers map on loaded parcels, 4) BBox loading triggers at zoom>=14 with 600ms debounce. Test commune: Villepinte (93078) loads 8 initial parcels, then 207 via BBox.",
+  "bug_fix_verification": {
+    "root_cause_1_duplicate_keys": "FIXED - parcel_id now uses idu field, all IDs unique",
+    "root_cause_2_distance_filter": "FIXED - parcels load correctly within reasonable distances",
+    "root_cause_3_circle_markers": "FIXED - parcels render as LeafletPolygon shapes, not CircleMarker"
+  }
+}

@@ -166,16 +166,32 @@ def parse_parcelle_feature(feature: Dict[str, Any]) -> Dict[str, Any]:
             avg_lat = sum(p[1] for p in first_poly) / len(first_poly)
             centroid = {"type": "Point", "coordinates": [avg_lon, avg_lat]}
     
-    # Calculate approximate surface from geometry
-    surface_m2 = props.get("contenance", 0)  # contenance in m²
-    
-    # Extract commune code
+    # Build unique parcel ID from cadastral reference fields
     code_commune = props.get("code_com", "") or props.get("code_insee", "")
     code_dep = props.get("code_dep", "") or (code_commune[:2] if code_commune else "")
+    section = props.get("section", "")
+    numero = props.get("numero", "")
+    feuille = props.get("feuille", "1")
+    surface_m2 = props.get("contenance", 0)  # contenance in m²
+    
+    # IDU (identifiant unique parcelle) from API Carto
+    idu = props.get("idu", "") or props.get("id", "")
+    
+    # Build a truly unique parcel_id
+    if idu:
+        parcel_id = f"fr_{idu}"
+    elif code_commune and section and numero:
+        parcel_id = f"fr_{code_commune}_{section}_{numero}_{feuille}"
+    else:
+        # Fallback: use hash of geometry coordinates
+        import hashlib
+        geom_str = str(geom.get("coordinates", []))[:200]
+        h = hashlib.md5(geom_str.encode()).hexdigest()[:12]
+        parcel_id = f"fr_g{h}"
     
     return {
-        "parcel_id": f"fr_{props.get('id', '')}",
-        "ref_cadastrale": props.get("id", ""),
+        "parcel_id": parcel_id,
+        "ref_cadastrale": idu or f"{code_commune}{section}{numero}",
         "code_commune": code_commune,
         "commune": props.get("nom_com", ""),
         "departement": code_dep,
@@ -189,9 +205,9 @@ def parse_parcelle_feature(feature: Dict[str, Any]) -> Dict[str, Any]:
         "longitude": centroid["coordinates"][0] if centroid else 0,
         
         # Section cadastrale
-        "section": props.get("section", ""),
-        "numero": props.get("numero", ""),
-        "feuille": props.get("feuille", ""),
+        "section": section,
+        "numero": numero,
+        "feuille": feuille,
         
         # Source
         "source": "api_carto_ign",

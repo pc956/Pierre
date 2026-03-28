@@ -8,7 +8,7 @@ import {
   TrendingUp, Clock, AlertTriangle, CheckCircle, XCircle, RefreshCw,
   Layers, Eye, EyeOff, Anchor, Cable, Building2, ExternalLink, X, Loader
 } from 'lucide-react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents, Marker, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents, Marker, Polyline, Polygon as LeafletPolygon } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -68,6 +68,40 @@ function MapEventHandler({ onBoundsChange, onZoomChange }) {
   });
   
   return null;
+}
+
+// Component to fly to parcels when they are loaded
+function FlyToParcels({ parcels, trigger }) {
+  const map = useMap();
+  const lastTrigger = useRef(0);
+  
+  useEffect(() => {
+    if (trigger > lastTrigger.current && parcels.length > 0) {
+      lastTrigger.current = trigger;
+      const bounds = L.latLngBounds(
+        parcels.slice(0, 50).map(p => [p.latitude, p.longitude])
+      );
+      if (bounds.isValid()) {
+        map.flyToBounds(bounds, { padding: [60, 60], maxZoom: 15, duration: 1.2 });
+      }
+    }
+  }, [trigger, parcels, map]);
+  
+  return null;
+}
+
+// Convert MultiPolygon/Polygon GeoJSON to Leaflet positions [[lat, lng], ...]
+function geoJsonToPositions(geometry) {
+  if (!geometry || !geometry.coordinates) return [];
+  try {
+    if (geometry.type === 'MultiPolygon') {
+      // Take the first polygon of the multi
+      return geometry.coordinates[0][0].map(([lng, lat]) => [lat, lng]);
+    } else if (geometry.type === 'Polygon') {
+      return geometry.coordinates[0].map(([lng, lat]) => [lat, lng]);
+    }
+  } catch { return []; }
+  return [];
 }
 
 // Score color helper
@@ -140,14 +174,15 @@ export default function Dashboard() {
   const [bboxLoading, setBboxLoading] = useState(false);
   const bboxTimerRef = useRef(null);
   const MIN_ZOOM_FOR_PARCELS = 14;
+  const [flyTrigger, setFlyTrigger] = useState(0);
   
   // Advanced filters
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [filters, setFilters] = useState({
-    distPosteMax: 20, // km
-    distLandingMax: 500, // km
+    distPosteMax: 100, // km - permissive default
+    distLandingMax: 1000, // km - permissive default
     surfaceMin: 0, // ha
-    surfaceMax: 100, // ha
+    surfaceMax: 500, // ha
     pluZones: [], // empty = all
   });
   
@@ -191,11 +226,11 @@ export default function Dashboard() {
       );
       const newParcels = response.data.parcelles || [];
       setFranceParcels(prev => {
-        // Merge with existing, avoiding duplicates
         const existing = new Set(prev.map(p => p.parcel_id));
         const unique = newParcels.filter(p => !existing.has(p.parcel_id));
         return [...prev, ...unique];
       });
+      setFlyTrigger(t => t + 1);
       setCommuneSearch('');
       setCommuneResults([]);
     } catch (error) {
@@ -218,6 +253,7 @@ export default function Dashboard() {
         const unique = newParcels.filter(p => !existing.has(p.parcel_id));
         return [...prev, ...unique];
       });
+      setFlyTrigger(t => t + 1);
     } catch (error) {
       console.error('Error loading parcels around point:', error);
     } finally {
@@ -266,18 +302,25 @@ export default function Dashboard() {
   
   // Apply advanced filters client-side
   const filteredParcels = allParcels.filter(p => {
-    // Distance poste HTB
-    const distPoste = (p.dist_poste_htb_m || 50000) / 1000;
-    if (distPoste > filters.distPosteMax) return false;
+    // Distance poste HTB - only filter if value is known
+    if (p.dist_poste_htb_m && p.dist_poste_htb_m > 0) {
+      const distPoste = p.dist_poste_htb_m / 1000;
+      if (distPoste > filters.distPosteMax) return false;
+    }
     
-    // Distance landing point
-    const distLanding = p.dist_landing_point_km || 1000;
-    if (distLanding > filters.distLandingMax) return false;
+    // Distance landing point - only filter if value is known
+    if (p.dist_landing_point_km && p.dist_landing_point_km > 0) {
+      if (p.dist_landing_point_km > filters.distLandingMax) return false;
+    }
     
     // Surface
     const surface = p.surface_ha || 0;
     if (surface < filters.surfaceMin) return false;
     if (filters.surfaceMax > 0 && surface > filters.surfaceMax) return false;
+    
+    // Score min
+    const score = p.score?.score_net || 0;
+    if (scoreMin > 0 && score < scoreMin) return false;
     
     // PLU zones
     if (filters.pluZones.length > 0 && !filters.pluZones.includes(p.plu_zone)) return false;
@@ -496,7 +539,7 @@ export default function Dashboard() {
           >
             <Filter size={12} />
             Filtres avancés
-            {(filters.pluZones.length > 0 || filters.distPosteMax < 20 || filters.distLandingMax < 500 || filters.surfaceMin > 0) && (
+            {(filters.pluZones.length > 0 || filters.distPosteMax < 100 || filters.distLandingMax < 1000 || filters.surfaceMin > 0) && (
               <span className="ml-1 w-2 h-2 rounded-full" style={{ background: '#00d4aa' }}></span>
             )}
           </button>
@@ -541,9 +584,9 @@ export default function Dashboard() {
               <input
                 type="number"
                 min="1"
-                max="50"
+                max="200"
                 value={filters.distPosteMax}
-                onChange={(e) => setFilters(f => ({ ...f, distPosteMax: parseInt(e.target.value) || 20 }))}
+                onChange={(e) => setFilters(f => ({ ...f, distPosteMax: parseInt(e.target.value) || 100 }))}
                 className="w-16 h-7 px-2 text-xs text-center"
               />
               <span className="text-xs" style={{ color: '#8f8f9d' }}>km</span>
@@ -624,10 +667,10 @@ export default function Dashboard() {
             {/* Reset button */}
             <button
               onClick={() => setFilters({
-                distPosteMax: 20,
-                distLandingMax: 500,
+                distPosteMax: 100,
+                distLandingMax: 1000,
                 surfaceMin: 0,
-                surfaceMax: 100,
+                surfaceMax: 500,
                 pluZones: [],
               })}
               className="text-xs flex items-center gap-1 hover:text-[#ff4757]"
@@ -793,20 +836,56 @@ export default function Dashboard() {
                       </Marker>
                     ))}
                     
-                    {/* Parcels */}
+                    {/* Parcels - rendered as cadastral polygons */}
                     {layers.parcels && filteredParcels.map(parcel => {
                       const score = parcel.score?.score_net || 0;
-                      const mw = parcel.score?.power_mw_p50 || 10;
+                      const positions = geoJsonToPositions(parcel.geometry);
+                      const color = getScoreColor(score);
+                      const isSelected = selectedParcel?.parcel_id === parcel.parcel_id;
                       
+                      if (positions.length > 2) {
+                        return (
+                          <LeafletPolygon
+                            key={parcel.parcel_id}
+                            positions={positions}
+                            pathOptions={{
+                              fillColor: color,
+                              fillOpacity: isSelected ? 0.7 : 0.35,
+                              color: isSelected ? '#ffffff' : '#00d4aa',
+                              weight: isSelected ? 3 : 1,
+                              opacity: 0.8,
+                            }}
+                            eventHandlers={{
+                              click: () => handleParcelClick(parcel)
+                            }}
+                          >
+                            <Popup>
+                              <div className="p-2" style={{ minWidth: 220 }}>
+                                <p className="font-bold text-sm">{parcel.commune}</p>
+                                <p className="text-xs text-gray-400">{parcel.ref_cadastrale} · {parcel.surface_ha?.toFixed(1)} ha</p>
+                                <p className="text-xs text-gray-400">HTB: {(parcel.dist_poste_htb_m/1000).toFixed(1)} km · LP: {parcel.dist_landing_point_km} km</p>
+                                <div className="mt-2 flex items-center gap-2">
+                                  <span className="font-mono text-lg" style={{ color }}>
+                                    {score.toFixed(0)}/100
+                                  </span>
+                                  <VerdictBadge verdict={parcel.score?.verdict} />
+                                </div>
+                              </div>
+                            </Popup>
+                          </LeafletPolygon>
+                        );
+                      }
+                      
+                      // Fallback: CircleMarker if no polygon geometry
                       return (
                         <CircleMarker
                           key={parcel.parcel_id}
                           center={[parcel.latitude, parcel.longitude]}
-                          radius={Math.max(6, Math.min(20, mw / 2))}
-                          fillColor={getScoreColor(score)}
-                          fillOpacity={0.8}
-                          color={getScoreColor(score)}
-                          weight={1}
+                          radius={8}
+                          fillColor={color}
+                          fillOpacity={0.7}
+                          color="#00d4aa"
+                          weight={1.5}
                           eventHandlers={{
                             click: () => handleParcelClick(parcel)
                           }}
@@ -814,9 +893,9 @@ export default function Dashboard() {
                           <Popup>
                             <div className="p-2" style={{ minWidth: 200 }}>
                               <p className="font-bold text-sm">{parcel.commune}</p>
-                              <p className="text-xs text-gray-400">{parcel.region} · {parcel.surface_ha?.toFixed(1)} ha</p>
+                              <p className="text-xs text-gray-400">{parcel.ref_cadastrale} · {parcel.surface_ha?.toFixed(1)} ha</p>
                               <div className="mt-2 flex items-center gap-2">
-                                <span className="font-mono text-lg" style={{ color: getScoreColor(score) }}>
+                                <span className="font-mono text-lg" style={{ color }}>
                                   {score.toFixed(0)}/100
                                 </span>
                                 <VerdictBadge verdict={parcel.score?.verdict} />
@@ -826,6 +905,8 @@ export default function Dashboard() {
                         </CircleMarker>
                       );
                     })}
+                    
+                    <FlyToParcels parcels={franceParcels} trigger={flyTrigger} />
                   </MapContainer>
                 
                 {/* Zoom indicator overlay */}

@@ -643,7 +643,7 @@ async def get_bbox_parcelles(
     for feature in data.get("features", [])[:limit]:
         parsed = parse_parcelle_feature(feature)
         
-        if parsed["surface_ha"] >= 0.3 and parsed.get("centroid"):
+        if parsed.get("centroid"):
             # Compute real distances to nearest infrastructure
             plat = parsed["latitude"]
             plon = parsed["longitude"]
