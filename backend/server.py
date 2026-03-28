@@ -27,6 +27,7 @@ from api_carto import (
     get_parcelles_around_point, get_sections_by_commune, parse_parcelle_feature
 )
 from france_infra_data import get_all_france_infra
+from s3renr_data import S3RENR_DATA, get_s3renr_top_opportunities
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -459,6 +460,90 @@ async def compare_parcels(parcel_ids: List[str], project_type: str = "colocation
 # Load France infrastructure once at import time
 _FRANCE_INFRA = get_all_france_infra()
 
+# ── S3REnR Enrichment: merge capacity data into HTB postes ──
+def _normalize(name):
+    """Normalize a poste name for fuzzy matching"""
+    import re
+    n = name.upper().replace("POSTE ", "").replace("-", " ").replace("'", " ")
+    n = re.sub(r'\d+KV', '', n).strip()
+    # Remove trailing numbers like "225" or "400"
+    n = re.sub(r'\s+\d+$', '', n).strip()
+    return n
+
+# Region mapping: france_infra_data region -> S3REnR region key
+_REGION_MAP = {
+    "IDF": "IDF",
+    "PACA": "PACA",
+    "HdF": "HdF",
+}
+
+def _build_s3renr_lookup():
+    """Build a lookup dict: normalized_name -> s3renr_data for each region"""
+    lookup = {}
+    for region_key, region_data in S3RENR_DATA.items():
+        for poste_name, poste_data in region_data.get("postes", {}).items():
+            norm = _normalize(poste_name)
+            lookup[(region_key, norm)] = {
+                "s3renr_region": region_key,
+                "s3renr_poste": poste_name,
+                **poste_data,
+            }
+            # Also store without region for partial matches
+            if norm not in lookup:
+                lookup[("ANY", norm)] = {
+                    "s3renr_region": region_key,
+                    "s3renr_poste": poste_name,
+                    **poste_data,
+                }
+    return lookup
+
+_S3RENR_LOOKUP = _build_s3renr_lookup()
+
+def _enrich_poste_with_s3renr(poste):
+    """Try to match a HTB poste with S3REnR data and return enriched copy"""
+    region = poste.get("region", "")
+    s3renr_region = _REGION_MAP.get(region)
+    norm_name = _normalize(poste.get("nom", ""))
+    
+    s3renr = None
+    # Try exact region match first
+    if s3renr_region:
+        s3renr = _S3RENR_LOOKUP.get((s3renr_region, norm_name))
+    # Try any region match
+    if not s3renr:
+        s3renr = _S3RENR_LOOKUP.get(("ANY", norm_name))
+    # Try partial: check if any s3renr poste name is contained in the HTB name
+    if not s3renr and s3renr_region:
+        for poste_name, poste_data in S3RENR_DATA.get(s3renr_region, {}).get("postes", {}).items():
+            if _normalize(poste_name) in norm_name or norm_name in _normalize(poste_name):
+                s3renr = {"s3renr_region": s3renr_region, "s3renr_poste": poste_name, **poste_data}
+                break
+    
+    enriched = {**poste}
+    if s3renr:
+        enriched["s3renr"] = {
+            "region": s3renr.get("s3renr_region"),
+            "poste_s3renr": s3renr.get("s3renr_poste"),
+            "mw_reserve": s3renr.get("mw_reserve", 0),
+            "mw_consomme": s3renr.get("mw_consomme", 0),
+            "mw_dispo": s3renr.get("mw_dispo", 0),
+            "etat": s3renr.get("etat", "inconnu"),
+            "renforcement": s3renr.get("renforcement"),
+            "score_dc": s3renr.get("score_dc", 0),
+            "tension_kv": s3renr.get("tension_kv"),
+        }
+    else:
+        # For postes in regions covered by S3REnR but no match, mark as "non référencé"
+        if s3renr_region and s3renr_region in S3RENR_DATA:
+            region_status = S3RENR_DATA[s3renr_region].get("status_global", "")
+            enriched["s3renr"] = {
+                "region": s3renr_region,
+                "etat": "sature" if region_status == "SATURE" else "non_reference",
+                "mw_dispo": 0 if region_status == "SATURE" else None,
+                "note": f"Région {s3renr_region}: {region_status}" if region_status == "SATURE" else None,
+            }
+    return enriched
+
 @api_router.get("/map/parcels")
 async def get_map_parcels(
     project_type: str = "colocation_t3",
@@ -525,15 +610,61 @@ async def get_map_submarine_cables():
 
 @api_router.get("/map/electrical-assets")
 async def get_map_electrical_assets(asset_type: Optional[str] = None):
-    """Get electrical assets (postes HTB, lignes 400kV, lignes 225kV) for map - nationwide"""
-    all_assets = (
-        _FRANCE_INFRA["postes_htb"] +
-        _FRANCE_INFRA["lignes_400kv"] +
-        _FRANCE_INFRA["lignes_225kv"]
-    )
+    """Get electrical assets (postes HTB, lignes 400kV, lignes 225kV) for map - nationwide
+    Postes HTB are enriched with S3REnR capacity/saturation data when available."""
+    postes = [_enrich_poste_with_s3renr(p) for p in _FRANCE_INFRA["postes_htb"]]
+    lignes = _FRANCE_INFRA["lignes_400kv"] + _FRANCE_INFRA["lignes_225kv"]
+    
+    all_assets = postes + lignes
     if asset_type:
         all_assets = [a for a in all_assets if a.get("type") == asset_type]
     return {"electrical_assets": all_assets}
+
+
+@api_router.get("/s3renr/top-opportunities")
+async def get_s3renr_opportunities(min_mw: int = 30, limit: int = 20):
+    """Get top S3REnR opportunities for DC siting, sorted by MW available"""
+    opportunities = get_s3renr_top_opportunities(min_mw=min_mw, limit=limit)
+    
+    # Add region-level metadata
+    regions_meta = {}
+    for region_key, region_data in S3RENR_DATA.items():
+        regions_meta[region_key] = {
+            "status_global": region_data.get("status_global"),
+            "capacite_globale_mw": region_data.get("capacite_globale_mw"),
+            "taux_consommation_pct": region_data.get("taux_consommation_pct"),
+        }
+    
+    return {
+        "opportunities": opportunities,
+        "count": len(opportunities),
+        "regions": regions_meta,
+    }
+
+
+@api_router.get("/s3renr/summary")
+async def get_s3renr_summary():
+    """Get S3REnR summary stats per region"""
+    summary = []
+    for region_key, region_data in S3RENR_DATA.items():
+        postes = region_data.get("postes", {})
+        total_dispo = sum(p.get("mw_dispo", 0) for p in postes.values())
+        total_reserve = sum(p.get("mw_reserve", 0) for p in postes.values())
+        nb_satures = sum(1 for p in postes.values() if p.get("etat") == "sature")
+        nb_disponibles = sum(1 for p in postes.values() if p.get("etat") == "disponible")
+        nb_contraints = sum(1 for p in postes.values() if p.get("etat") == "contraint")
+        summary.append({
+            "region": region_key,
+            "status_global": region_data.get("status_global"),
+            "capacite_globale_mw": region_data.get("capacite_globale_mw"),
+            "mw_dispo_total": total_dispo,
+            "mw_reserve_total": total_reserve,
+            "nb_postes": len(postes),
+            "nb_disponibles": nb_disponibles,
+            "nb_contraints": nb_contraints,
+            "nb_satures": nb_satures,
+        })
+    return {"summary": summary}
 
 
 # ═══════════════════════════════════════════════════════════

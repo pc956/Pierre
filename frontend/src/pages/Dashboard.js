@@ -23,11 +23,26 @@ const createIcon = (color, size = 10) => L.divIcon({
   iconAnchor: [size/2, size/2],
 });
 
-const posteIcon = (tension) => {
-  const color = tension >= 400 ? '#ff4757' : tension >= 225 ? '#ffa502' : '#3b82f6';
+const posteIcon = (tension, s3renr) => {
+  // S3REnR-based coloring: green=disponible, orange=contraint, red=saturé, default=by tension
+  let color;
+  let borderColor = '#fff';
+  if (s3renr) {
+    const etat = s3renr.etat;
+    if (etat === 'disponible') { color = '#2ed573'; borderColor = '#fff'; }
+    else if (etat === 'contraint') { color = '#ffa502'; borderColor = '#fff'; }
+    else if (etat === 'sature') { color = '#ff4757'; borderColor = '#fff'; }
+    else if (etat === 'non_reference') { color = tension >= 400 ? '#ff4757' : tension >= 225 ? '#ffa502' : '#3b82f6'; borderColor = '#555'; }
+    else { color = tension >= 400 ? '#ff4757' : tension >= 225 ? '#ffa502' : '#3b82f6'; }
+  } else {
+    color = tension >= 400 ? '#ff4757' : tension >= 225 ? '#ffa502' : '#3b82f6';
+  }
+  const mwLabel = s3renr && s3renr.mw_dispo != null && s3renr.mw_dispo > 0
+    ? `<div style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);background:${color};color:#000;font-size:8px;font-weight:bold;padding:0 3px;border-radius:2px;white-space:nowrap;">${s3renr.mw_dispo}MW</div>`
+    : '';
   return L.divIcon({
     className: 'poste-icon',
-    html: `<div style="width:14px;height:14px;background:${color};border:2px solid #fff;transform:rotate(45deg);box-shadow:0 2px 4px rgba(0,0,0,0.5);"></div>`,
+    html: `<div style="position:relative;">${mwLabel}<div style="width:14px;height:14px;background:${color};border:2px solid ${borderColor};transform:rotate(45deg);box-shadow:0 2px 4px rgba(0,0,0,0.5);"></div></div>`,
     iconSize: [14, 14],
     iconAnchor: [7, 7],
   });
@@ -147,6 +162,7 @@ export default function Dashboard() {
   const [dcExistants, setDcExistants] = useState([]);
   const [submarineCables, setSubmarineCables] = useState([]);
   const [electricalAssets, setElectricalAssets] = useState([]);
+  const [s3renrSummary, setS3renrSummary] = useState([]);
   
   // Layer visibility
   const [showLayers, setShowLayers] = useState(false);
@@ -330,16 +346,18 @@ export default function Dashboard() {
 
   const fetchMapLayers = async () => {
     try {
-      const [lpRes, dcRes, cablesRes, elecRes] = await Promise.all([
+      const [lpRes, dcRes, cablesRes, elecRes, s3renrRes] = await Promise.all([
         axios.get(`${API}/map/landing-points`),
         axios.get(`${API}/map/dc`),
         axios.get(`${API}/map/submarine-cables`),
         axios.get(`${API}/map/electrical-assets`),
+        axios.get(`${API}/s3renr/summary`),
       ]);
       setLandingPoints(lpRes.data.landing_points || []);
       setDcExistants(dcRes.data.dc_existants || []);
       setSubmarineCables(cablesRes.data.submarine_cables || []);
       setElectricalAssets(elecRes.data.electrical_assets || []);
+      setS3renrSummary(s3renrRes.data.summary || []);
     } catch (error) {
       console.error('Error fetching map layers:', error);
     }
@@ -762,14 +780,70 @@ export default function Dashboard() {
                       <Marker
                         key={poste.asset_id}
                         position={[poste.geometry.coordinates[1], poste.geometry.coordinates[0]]}
-                        icon={posteIcon(poste.tension_kv)}
+                        icon={posteIcon(poste.tension_kv, poste.s3renr)}
                       >
                         <Popup>
-                          <div className="p-2">
-                            <p className="font-bold">{poste.nom}</p>
+                          <div className="p-2" style={{ minWidth: 220 }}>
+                            <p className="font-bold text-sm">{poste.nom}</p>
                             <p className="text-xs text-gray-400">
-                              {poste.tension_kv} kV · {poste.puissance_mva} MVA
+                              {poste.tension_kv} kV · {poste.puissance_mva} MVA · {poste.region}
                             </p>
+                            {poste.s3renr && (
+                              <div className="mt-2 pt-2" style={{ borderTop: '1px solid #333' }}>
+                                <p className="text-xs font-bold" style={{ 
+                                  color: poste.s3renr.etat === 'disponible' ? '#2ed573' 
+                                       : poste.s3renr.etat === 'contraint' ? '#ffa502' 
+                                       : poste.s3renr.etat === 'sature' ? '#ff4757' 
+                                       : '#8f8f9d' 
+                                }}>
+                                  S3REnR: {poste.s3renr.etat === 'disponible' ? 'DISPONIBLE' 
+                                         : poste.s3renr.etat === 'contraint' ? 'CONTRAINT' 
+                                         : poste.s3renr.etat === 'sature' ? 'SATURE' 
+                                         : poste.s3renr.etat === 'non_reference' ? 'Non référencé' 
+                                         : poste.s3renr.etat?.toUpperCase()}
+                                </p>
+                                {poste.s3renr.mw_dispo != null && (
+                                  <div className="mt-1">
+                                    <div className="flex justify-between text-xs">
+                                      <span style={{ color: '#8f8f9d' }}>MW Disponible</span>
+                                      <span className="font-bold" style={{ color: '#2ed573' }}>{poste.s3renr.mw_dispo} MW</span>
+                                    </div>
+                                    {poste.s3renr.mw_reserve != null && (
+                                      <div className="flex justify-between text-xs">
+                                        <span style={{ color: '#8f8f9d' }}>Réserve / Consommé</span>
+                                        <span>{poste.s3renr.mw_reserve} / {poste.s3renr.mw_consomme || 0} MW</span>
+                                      </div>
+                                    )}
+                                    {poste.s3renr.mw_reserve > 0 && (
+                                      <div className="mt-1" style={{ background: '#1a1a2e', borderRadius: 4, overflow: 'hidden', height: 6 }}>
+                                        <div style={{ 
+                                          width: `${Math.min(100, ((poste.s3renr.mw_consomme || 0) / poste.s3renr.mw_reserve) * 100)}%`,
+                                          height: '100%',
+                                          background: poste.s3renr.etat === 'disponible' ? '#2ed573' : poste.s3renr.etat === 'contraint' ? '#ffa502' : '#ff4757',
+                                          borderRadius: 4,
+                                        }} />
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                {poste.s3renr.score_dc != null && poste.s3renr.score_dc > 0 && (
+                                  <div className="flex justify-between text-xs mt-1">
+                                    <span style={{ color: '#8f8f9d' }}>Score DC</span>
+                                    <span className="font-bold">{poste.s3renr.score_dc}/10</span>
+                                  </div>
+                                )}
+                                {poste.s3renr.renforcement && (
+                                  <p className="text-xs mt-1" style={{ color: '#00d4aa' }}>
+                                    Renforcement: {poste.s3renr.renforcement}
+                                  </p>
+                                )}
+                                {poste.s3renr.note && (
+                                  <p className="text-xs mt-1" style={{ color: '#ff4757' }}>
+                                    {poste.s3renr.note}
+                                  </p>
+                                )}
+                              </div>
+                            )}
                             <button
                               onClick={() => loadParcelsAroundPoint(
                                 poste.geometry.coordinates[0],
@@ -1033,15 +1107,15 @@ export default function Dashboard() {
                       <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Légende</p>
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 text-xs">
-                          <span style={{ width: 12, height: 12, background: '#ff4757', transform: 'rotate(45deg)' }}></span>
+                          <span style={{ width: 12, height: 12, background: '#ff4757', transform: 'rotate(45deg)', display: 'inline-block' }}></span>
                           <span style={{ color: '#e8e8ed' }}>Poste 400kV</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs">
-                          <span style={{ width: 12, height: 12, background: '#ffa502', transform: 'rotate(45deg)' }}></span>
+                          <span style={{ width: 12, height: 12, background: '#ffa502', transform: 'rotate(45deg)', display: 'inline-block' }}></span>
                           <span style={{ color: '#e8e8ed' }}>Poste 225kV</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs">
-                          <span style={{ width: 12, height: 12, background: '#3b82f6', transform: 'rotate(45deg)' }}></span>
+                          <span style={{ width: 12, height: 12, background: '#3b82f6', transform: 'rotate(45deg)', display: 'inline-block' }}></span>
                           <span style={{ color: '#e8e8ed' }}>Poste 63kV</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs">
@@ -1049,8 +1123,25 @@ export default function Dashboard() {
                           <span style={{ color: '#e8e8ed' }}>Landing point</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs">
-                          <span style={{ width: 12, height: 12, background: '#8b5cf6', borderRadius: 2 }}></span>
+                          <span style={{ width: 12, height: 12, background: '#8b5cf6', borderRadius: 2, display: 'inline-block' }}></span>
                           <span style={{ color: '#e8e8ed' }}>DC existant</span>
+                        </div>
+                      </div>
+                      
+                      {/* S3REnR Legend */}
+                      <p className="text-xs font-mono uppercase mt-3" style={{ color: '#8f8f9d' }}>S3REnR (Capacités réseau)</p>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span style={{ width: 12, height: 12, background: '#2ed573', transform: 'rotate(45deg)', display: 'inline-block' }}></span>
+                          <span style={{ color: '#2ed573' }}>Disponible</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span style={{ width: 12, height: 12, background: '#ffa502', transform: 'rotate(45deg)', display: 'inline-block' }}></span>
+                          <span style={{ color: '#ffa502' }}>Contraint</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span style={{ width: 12, height: 12, background: '#ff4757', transform: 'rotate(45deg)', display: 'inline-block' }}></span>
+                          <span style={{ color: '#ff4757' }}>Saturé</span>
                         </div>
                       </div>
                     </div>
@@ -1077,6 +1168,34 @@ export default function Dashboard() {
                         </span>
                       </div>
                     </div>
+                    
+                    {/* S3REnR Regional Summary */}
+                    {s3renrSummary.length > 0 && (
+                      <div className="mt-6 space-y-2" data-testid="s3renr-summary">
+                        <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>S3REnR — Capacités réseau</p>
+                        {s3renrSummary.map(region => (
+                          <div key={region.region} className="p-2 rounded" style={{ background: '#12121f', border: '1px solid #1e1e35' }}>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs font-bold" style={{ color: '#e8e8ed' }}>{region.region}</span>
+                              <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ 
+                                background: region.status_global === 'SATURE' ? '#ff475722' : '#2ed57322',
+                                color: region.status_global === 'SATURE' ? '#ff4757' : '#2ed573',
+                              }}>
+                                {region.status_global}
+                              </span>
+                            </div>
+                            <div className="mt-1 text-xs" style={{ color: '#8f8f9d' }}>
+                              {region.mw_dispo_total} MW dispo · {region.nb_postes} postes
+                            </div>
+                            <div className="flex gap-2 mt-1 text-xs">
+                              <span style={{ color: '#2ed573' }}>{region.nb_disponibles} dispo</span>
+                              <span style={{ color: '#ffa502' }}>{region.nb_contraints} contr.</span>
+                              <span style={{ color: '#ff4757' }}>{region.nb_satures} sat.</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
