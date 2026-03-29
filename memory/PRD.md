@@ -7,7 +7,7 @@ Plateforme de prospection foncière pour data centers en France. Interface IA-Fi
 - **Backend**: FastAPI + MongoDB + Emergent LLM (GPT-4.1-mini)
 - **Frontend**: React + TailwindCSS + React-Leaflet + Shadcn/UI
 - **Auth**: Emergent Google Auth
-- **APIs externes**: IGN Carto (cadastre), GPU (urbanisme), Géorisques, Geo API gouv.fr
+- **APIs externes**: IGN Carto (cadastre), GPU (urbanisme), Géorisques, Geo API gouv.fr, DVF Cerema
 
 ## Fonctionnalités implémentées
 
@@ -32,14 +32,30 @@ Plateforme de prospection foncière pour data centers en France. Interface IA-Fi
 - [x] **Étape 8**: Score breakdown barres dans chatbot et panel détail
 - [x] **Étape 9**: Agrégation parcelles adjacentes (sites composites < 100m)
 
+### V2 Correctifs (29/03/2026)
+- [x] **Correctif 1**: 5 nouvelles couches carte (zones industrielles GPU, heatmap MW, zones inondables, cours d'eau WMS IGN, fond routier)
+- [x] **Correctif 2**: DVF réel via API Cerema (cascade: commune API → dept hardcode → région fallback)
+- [x] **Correctif 3**: Nettoyage complet project_type (supprimé de server.py, models.py, endpoints)
+
 ## Verdicts scoring
 - **GO** (≥70): Site prometteur
 - **À ÉTUDIER** (40-69): Potentiel à confirmer
 - **DÉFAVORABLE** (<40): Difficultés majeures
 - **EXCLU**: Zone non constructible (A, N)
 
+## Score structure
+```json
+{
+  "score": 75,
+  "verdict": "GO",
+  "detail": {"distance_rte": 35, "mw_disponibles": 25, "plu": 15, "surface": 10, "malus": -10},
+  "flags": ["ZONE INONDABLE (PPRI)"],
+  "resume": "Score 75/100 — GO. Parcelle de 3.2 ha en zone PLU UX à 1.2 km du poste FEUILLANE (225kV)..."
+}
+```
+
 ## Backlog
-- [ ] **P1**: Couches risques environnementaux (flood, seismic) sur carte
+- [ ] **P1**: Couches risques environnementaux avancées (Géorisques overlay direct)
 - [ ] **P2**: Comparaison côte-à-côte de sites
 - [ ] **P2**: Mode COMEX (vue exécutive)
 - [ ] **P2**: Alertes automatiques
@@ -51,3 +67,5 @@ Plateforme de prospection foncière pour data centers en France. Interface IA-Fi
 - `POST /api/export/pdf` — Fiche d'Opportunité PDF
 - `GET /api/s3renr/summary` — Résumé régional
 - `GET /api/france/parcelles/bbox` — Parcelles par viewport
+- `GET /api/france/gpu-zones` — Zones industrielles GPU par bbox
+- `GET /api/parcels/{id}/score` — Score universel d'une parcelle
