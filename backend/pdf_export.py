@@ -201,6 +201,13 @@ def generate_parcel_pdf(parcel: dict, dvf_data: dict = None) -> bytes:
         key_rows.append(("Prix foncier estimé", f"{dvf_prix} €/m² (source DVF)"))
     if renforcement:
         key_rows.append(("Renforcement prévu", str(renforcement)))
+    dist_eau = parcel.get("dist_cours_eau_m")
+    nom_eau = parcel.get("nom_cours_eau")
+    if dist_eau:
+        key_rows.append(("Cours d'eau", f"{nom_eau or 'Cours d eau'} à {dist_eau/1000:.1f} km"))
+    dist_route = parcel.get("dist_route_m")
+    if dist_route:
+        key_rows.append(("Route principale", f"{parcel.get('nom_route', 'Route')} ({parcel.get('type_route', '')}) à {dist_route/1000:.1f} km"))
     elements.append(_data_table(key_rows))
     elements.append(Spacer(1, 2*mm))
 

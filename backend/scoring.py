@@ -182,6 +182,19 @@ def compute_score_simple(parcel: dict) -> dict:
     elif etat_s3renr == "sature":
         resume_parts.append("réseau saturé")
 
+    # Cours d'eau
+    dist_eau = parcel.get("dist_cours_eau_m")
+    nom_eau = parcel.get("nom_cours_eau")
+    if dist_eau and dist_eau < 1000:
+        resume_parts.append(f"à {dist_eau}m de {nom_eau or 'un cours d eau'} (refroidissement)")
+    elif dist_eau and dist_eau < 3000:
+        resume_parts.append(f"cours d'eau à {dist_eau/1000:.1f} km")
+
+    # Route principale
+    dist_route = parcel.get("dist_route_m")
+    if dist_route and dist_route < 2000:
+        resume_parts.append(f"à {dist_route}m de {parcel.get('nom_route', 'axe routier')} ({parcel.get('type_route', '')})")
+
     if flags:
         risk_flags = [f for f in flags if "NON CONSTRUCTIBLE" not in f]
         if risk_flags:

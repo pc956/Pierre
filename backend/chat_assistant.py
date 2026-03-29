@@ -24,6 +24,8 @@ from dvf_data import get_real_dvf_price
 from plu_scoring import score_plu, score_plu_dynamic
 from fibre_data import estimate_fibre
 from georisques import enrich_georisques
+from water_data import get_nearest_water
+from road_data import get_nearest_road
 
 load_dotenv()
 logger = logging.getLogger("chat_assistant")
@@ -260,6 +262,9 @@ async def _enrich_parcel(parsed: dict, infra: dict, params: dict) -> dict:
         parsed["zone_sismique"] = risques.get("zone_sismique", 1)
         parsed["argiles_alea"] = risques.get("argiles_alea", "faible")
 
+    # ── Cours d'eau + Route principale → déplacé en post-enrichment pour top parcelles ──
+    # (Overpass API est lent, on enrichit seulement les top résultats après tri)
+
     # ── DVF réel (Étape 2E — API Cerema avec fallback) ──
     code_dep = parsed.get("departement", "")
     dvf_result = await get_real_dvf_price(code_commune, code_dep, region)
@@ -450,6 +455,34 @@ async def _find_real_parcels(params: dict) -> dict:
 
     final_parcels = unique_parcels[:nb_parcels_max]
 
+    # ── Post-enrichment: Overpass eau + route (top 5 seulement) ──
+    async def _enrich_overpass(p):
+        plon = p["longitude"]
+        plat = p["latitude"]
+        try:
+            water, road = await asyncio.wait_for(
+                asyncio.gather(
+                    get_nearest_water(plon, plat),
+                    get_nearest_road(plon, plat),
+                    return_exceptions=True
+                ),
+                timeout=10
+            )
+            if isinstance(water, dict):
+                p["dist_cours_eau_m"] = water.get("dist_cours_eau_m")
+                p["nom_cours_eau"] = water.get("nom_cours_eau")
+            if isinstance(road, dict):
+                p["dist_route_m"] = road.get("dist_route_m")
+                p["nom_route"] = road.get("nom_route")
+                p["type_route"] = road.get("type_route")
+        except Exception:
+            pass
+        return p
+
+    # Enrich top 5 parcels with Overpass data (sequential to respect rate limits)
+    for p in final_parcels[:5]:
+        await _enrich_overpass(p)
+
     # Clean parcels for JSON response
     clean_parcels = []
     for p in final_parcels:
@@ -481,6 +514,11 @@ async def _find_real_parcels(params: dict) -> dict:
             "dvf_source": p.get("dvf_source", "inconnu"),
             "ppri_zone": p.get("ppri_zone"),
             "zone_sismique": p.get("zone_sismique", 1),
+            "dist_cours_eau_m": p.get("dist_cours_eau_m"),
+            "nom_cours_eau": p.get("nom_cours_eau"),
+            "dist_route_m": p.get("dist_route_m"),
+            "nom_route": p.get("nom_route"),
+            "type_route": p.get("type_route"),
             "dist_future_400kv_m": p.get("dist_future_400kv_m", 0),
             "future_400kv_buffer": p.get("future_400kv_buffer"),
             "future_400kv_score_bonus": p.get("future_400kv_score_bonus", 0),

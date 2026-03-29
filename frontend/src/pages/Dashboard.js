@@ -177,6 +177,8 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState(null);
+  const [compareList, setCompareList] = useState([]);
+  const [showComparePanel, setShowComparePanel] = useState(false);
   
   // Mobile state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -339,6 +341,15 @@ export default function Dashboard() {
 
   const handleParcelClick = (parcel) => {
     setSelectedParcel(parcel);
+  };
+
+  const addToCompare = (parcel) => {
+    if (compareList.length >= 3) return;
+    if (compareList.find(p => p.parcel_id === parcel.parcel_id)) return;
+    setCompareList(prev => [...prev, parcel]);
+  };
+  const removeFromCompare = (id) => {
+    setCompareList(prev => prev.filter(p => p.parcel_id !== id));
   };
 
   const toggleLayer = (layerName) => {
@@ -1010,6 +1021,8 @@ export default function Dashboard() {
                     parcel={selectedParcel} 
                     onClose={() => setSelectedParcel(null)}
                     onShowSiren={(p) => setSirenModal(p)}
+                    addToCompare={addToCompare}
+                    compareList={compareList}
                   />
                 ) : (
                   <div className="p-4">
@@ -1171,6 +1184,77 @@ export default function Dashboard() {
           onClose={() => setSirenModal(null)} 
         />
       )}
+
+      {/* Compare bar */}
+      {compareList.length >= 2 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 p-3 flex items-center justify-between"
+          style={{ background: '#12121aee', borderTop: '2px solid #3b82f6', backdropFilter: 'blur(10px)' }}
+          data-testid="compare-bar">
+          <div className="flex gap-2">
+            {compareList.map(p => (
+              <div key={p.parcel_id} className="px-3 py-1 text-xs font-mono flex items-center gap-2" style={{ background: '#1f1f2e', color: '#e8e8ed', borderRadius: 4 }}>
+                {p.commune || p.ref_cadastrale} — {p.score?.score || 0}/100
+                <button onClick={() => removeFromCompare(p.parcel_id)} style={{ color: '#ff4757' }} data-testid="compare-remove-btn">×</button>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => setShowComparePanel(true)}
+            className="px-4 py-2 text-xs font-mono uppercase rounded hover:opacity-90 transition-opacity"
+            style={{ background: '#3b82f6', color: '#fff' }}
+            data-testid="compare-open-btn">
+            Comparer
+          </button>
+        </div>
+      )}
+
+      {/* Compare panel modal */}
+      {showComparePanel && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center" style={{ background: '#0008' }}>
+          <div className="w-full max-w-4xl max-h-[85vh] overflow-auto rounded-lg p-4" style={{ background: '#0a0a0f', border: '1px solid #1f1f2e' }}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold" style={{ color: '#e8e8ed' }}>Comparaison de parcelles</h2>
+              <button onClick={() => setShowComparePanel(false)} style={{ color: '#8f8f9d' }} data-testid="compare-close-btn"><X size={20} /></button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs font-mono" style={{ color: '#e8e8ed' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #1f1f2e' }}>
+                    <th className="py-2 px-3 text-left" style={{ color: '#8f8f9d' }}>Critère</th>
+                    {compareList.map(p => (
+                      <th key={p.parcel_id} className="py-2 px-3 text-center" style={{ color: '#00d4aa' }}>
+                        {p.commune || p.ref_cadastrale}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { label: 'Score', render: p => { const s = p.score?.score || 0; const c = s >= 70 ? '#2ed573' : s >= 40 ? '#ffa502' : '#ff4757'; return <span style={{color: c, fontWeight: 'bold'}}>{s}/100</span>; }},
+                    { label: 'Verdict', render: p => <VerdictBadge verdict={p.score?.verdict} /> },
+                    { label: 'Surface', render: p => `${p.surface_ha?.toFixed(2) || '-'} ha` },
+                    { label: 'Dist. HTB', render: p => p.dist_poste_htb_m ? `${(p.dist_poste_htb_m/1000).toFixed(1)} km` : '-' },
+                    { label: 'Tension', render: p => p.tension_htb_kv ? `${p.tension_htb_kv} kV` : '-' },
+                    { label: 'MW dispo', render: p => `${p.mw_dispo || '-'} (${p.zone_saturation || '-'})` },
+                    { label: 'Zone PLU', render: p => p.plu_zone || '-' },
+                    { label: 'Prix DVF', render: p => p.dvf_prix_median_m2 ? `${p.dvf_prix_median_m2} €/m²` : '-' },
+                    { label: "Cours d'eau", render: p => p.dist_cours_eau_m ? `${p.nom_cours_eau || '-'}: ${(p.dist_cours_eau_m/1000).toFixed(1)}km` : '-' },
+                    { label: 'Route', render: p => p.dist_route_m ? `${p.nom_route || '-'}: ${(p.dist_route_m/1000).toFixed(1)}km` : '-' },
+                    { label: 'Fibre', render: p => p.dist_backbone_fibre_m ? `${(p.dist_backbone_fibre_m/1000).toFixed(1)} km` : '-' },
+                    { label: 'Risques', render: p => (p.score?.flags || []).join(', ') || 'Aucun' },
+                  ].map((row, ri) => (
+                    <tr key={ri} style={{ borderBottom: '1px solid #1f1f2e08', background: ri % 2 === 0 ? '#12121a' : 'transparent' }}>
+                      <td className="py-2 px-3" style={{ color: '#8f8f9d' }}>{row.label}</td>
+                      {compareList.map(p => (
+                        <td key={p.parcel_id} className="py-2 px-3 text-center">{row.render(p)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1329,7 +1413,7 @@ function LayerToggle({ label, color, icon, active, onClick }) {
 }
 
 // Parcel Detail Panel
-function ParcelDetail({ parcel, onClose, onShowSiren }) {
+function ParcelDetail({ parcel, onClose, onShowSiren, addToCompare, compareList }) {
   const score = parcel.score || {};
   
   return (
@@ -1884,6 +1968,40 @@ function ParcelDetail({ parcel, onClose, onShowSiren }) {
             </div>
           </div>
         )}
+
+        {/* Compare button */}
+        {addToCompare && (
+          <button
+            onClick={() => addToCompare(parcel)}
+            disabled={(compareList || []).length >= 3 || (compareList || []).find(p => p.parcel_id === parcel.parcel_id)}
+            className="w-full flex items-center justify-center gap-2 py-2 text-xs font-mono uppercase rounded mb-2 hover:opacity-80 transition-opacity"
+            style={{
+              background: '#3b82f622', color: '#3b82f6', border: '1px solid #3b82f633',
+              opacity: (compareList || []).length >= 3 || (compareList || []).find(p => p.parcel_id === parcel.parcel_id) ? 0.5 : 1
+            }}
+            data-testid="compare-add-btn"
+          >
+            {(compareList || []).find(p => p.parcel_id === parcel.parcel_id) ? 'Déjà ajouté' : `Comparer (${(compareList || []).length}/3)`}
+          </button>
+        )}
+
+        {/* Google Maps + Street View links */}
+        <div className="flex gap-2 mb-2">
+          <a href={`https://www.google.com/maps/@${parcel.latitude},${parcel.longitude},17z/data=!3m1!1e3`}
+            target="_blank" rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-1 py-2 text-xs font-mono rounded hover:opacity-80 transition-opacity"
+            style={{ background: '#1f1f2e', color: '#8f8f9d', border: '1px solid #2a2a3e' }}
+            data-testid="satellite-link">
+            <MapIcon size={12} /> Satellite
+          </a>
+          <a href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${parcel.latitude},${parcel.longitude}`}
+            target="_blank" rel="noopener noreferrer"
+            className="flex-1 flex items-center justify-center gap-1 py-2 text-xs font-mono rounded hover:opacity-80 transition-opacity"
+            style={{ background: '#1f1f2e', color: '#8f8f9d', border: '1px solid #2a2a3e' }}
+            data-testid="streetview-link">
+            <Eye size={12} /> Street View
+          </a>
+        </div>
 
         {/* Export PDF */}
         <button

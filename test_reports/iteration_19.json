@@ -1,0 +1,68 @@
+{
+  "summary": "Iteration 19 - V3 Correctifs Testing Complete. Backend: 11/12 tests passed (92%). Frontend: All V3 features verified. New features: water_data.py, road_data.py, suggestion pills, Street View/Satellite links, compare mode, water+road in scoring/PDF.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/france/parcelles/bbox", "issue": "502 timeout on external IGN API call (intermittent, external dependency)", "priority": "LOW"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "=== BACKEND API TESTS (11/12) ===",
+    "GET /api/ returns API info (version 1.0.0)",
+    "GET /api/france/gpu-zones returns industrial zones array",
+    "POST /api/chat returns parcels with dist_cours_eau_m, nom_cours_eau, dist_route_m, nom_route, type_route fields",
+    "POST /api/chat parcels have score with score, verdict, detail (4 axes), flags, resume",
+    "POST /api/export/pdf returns valid PDF with water+road data",
+    "GET /api/map/electrical-assets returns 101+ postes HTB with S3REnR data",
+    "GET /api/map/dc returns 61 DC existants",
+    "GET /api/map/landing-points returns 8 landing points",
+    "GET /api/map/submarine-cables returns 15+ cables",
+    "GET /api/map/rte-future-400kv returns GeoJSON with line + buffers",
+    "GET /api/s3renr/summary returns region data (IDF SATURÉ, PACA ACTIF, HdF ACTIF)",
+    "=== FRONTEND UI TESTS ===",
+    "Login page loads correctly with Google Auth button",
+    "Dashboard loads with map showing all infrastructure layers",
+    "5 new layer toggles visible: Zones industrielles, Heatmap MW dispo, Zones inondables, Cours d'eau, Réseau routier",
+    "5 suggestion pills visible: PACA 2ha+, Fos-sur-Mer, Hauts-de-France, Score > 70, Grands terrains",
+    "Chatbot returns parcel results with ScoreBar components (RTE, MW, PLU, Surface)",
+    "Parcel cards show water info (Cours d'eau: X.Xkm) and road info (type_route: X.Xkm)",
+    "Parcel detail panel shows Satellite link (data-testid=satellite-link)",
+    "Parcel detail panel shows Street View link (data-testid=streetview-link)",
+    "Parcel detail panel shows Compare button (data-testid=compare-add-btn)",
+    "Compare bar appears when 2+ parcels added to compare list",
+    "PDF export button works (data-testid=export-pdf-btn)",
+    "S3REnR summary visible in sidebar (IDF: SATURÉ, PACA: ACTIF, HdF: ACTIF)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iteration19_v3_correctifs.py",
+    "/app/test_reports/pytest/pytest_results_iteration19.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_iteration19_v3_correctifs.py"
+  ],
+  "success_rate": {
+    "backend": "92% (11/12 tests passed)",
+    "frontend": "100% (all V3 features verified)"
+  },
+  "test_credentials": "Cookie: session_token=test_session_iteration19_1774809330575",
+  "seed_data_creation": "Created test user 'test-user-iteration19' with session for UI testing",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 19 verified V3 correctifs. Key features verified: 1) water_data.py - get_nearest_water() via Overpass API returns dist_cours_eau_m, nom_cours_eau. 2) road_data.py - get_nearest_road() via Overpass API returns dist_route_m, nom_route, type_route. 3) Suggestion pills (5 pills) visible when messages.length <= 1. 4) Street View + Satellite links in ParcelDetail with data-testid. 5) Compare mode with compareList state (max 3 parcels), compare bar at bottom, compare modal table. 6) Water+road data integrated in scoring resume and PDF export. Chat endpoint may take 30-60s due to Overpass enrichment for top 5 parcels. All APIs are live (no mocked APIs).",
+  "v3_correctifs_verification": {
+    "correctif_1_water_data": "VERIFIED - water_data.py returns dist_cours_eau_m, nom_cours_eau via Overpass API",
+    "correctif_2_road_data": "VERIFIED - road_data.py returns dist_route_m, nom_route, type_route via Overpass API",
+    "correctif_3_suggestion_pills": "VERIFIED - 5 pills visible: PACA 2ha+, Fos-sur-Mer, Hauts-de-France, Score > 70, Grands terrains",
+    "correctif_4_streetview_satellite": "VERIFIED - Both links present in ParcelDetail with correct data-testid",
+    "correctif_5_compare_mode": "VERIFIED - Compare button, compare bar, compare modal all working",
+    "correctif_6_water_road_in_scoring": "VERIFIED - Water/road data shown in parcel cards and included in PDF export"
+  },
+  "mocked_api_note": "No mocked APIs - Water and road data use Overpass API (real OSM data). DVF uses Cerema API with dept/region fallback."
+}

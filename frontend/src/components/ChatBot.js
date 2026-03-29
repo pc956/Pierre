@@ -237,6 +237,26 @@ export default function ChatBot({ onFlyTo, onHighlightSites, onSelectParcelFromC
         </div>
       )}
 
+      {/* Suggestions rapides */}
+      {messages.length <= 1 && (
+        <div className="flex flex-wrap gap-2 px-4 pb-3" data-testid="suggestion-pills">
+          {[
+            { label: "PACA 2ha+", query: "Parcelles en PACA de 2 hectares minimum" },
+            { label: "Fos-sur-Mer", query: "Parcelles à Fos-sur-Mer pour data center" },
+            { label: "Hauts-de-France", query: "Parcelles en Hauts-de-France de 2 hectares minimum" },
+            { label: "Score > 70", query: "Parcelles avec un score supérieur à 70 en PACA" },
+            { label: "Grands terrains", query: "Parcelles de 5 hectares minimum en France" },
+          ].map((s, i) => (
+            <button key={i} onClick={() => { setInput(s.query); }}
+              className="px-3 py-1 text-[10px] font-mono rounded-full hover:opacity-80 transition-opacity"
+              style={{ background: '#1f1f2e', border: '1px solid #2a2a3e', color: '#8f8f9d' }}
+              data-testid={`suggestion-pill-${i}`}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Input */}
       <div className="px-3 py-3 shrink-0" style={{ borderTop: '1px solid #1f1f2e' }}>
         <div className="flex items-center gap-2">
@@ -482,10 +502,16 @@ function ChatMessage({ msg, onSiteClick, onParcelClick }) {
                   )}
 
                   {/* Extra info */}
-                  <div className="flex items-center gap-1.5 mt-0.5 text-[10px]" style={{ color: '#8f8f9d' }}>
+                  <div className="flex items-center gap-1.5 mt-0.5 text-[10px] flex-wrap" style={{ color: '#8f8f9d' }}>
                     <span>{p.tension_htb_kv}kV</span>
                     {p.dvf_prix_median_m2 > 0 && <span>{p.dvf_prix_median_m2}€/m²</span>}
                     {p.dist_backbone_fibre_m > 0 && <span>Fibre: {(p.dist_backbone_fibre_m / 1000).toFixed(1)}km</span>}
+                    {p.dist_cours_eau_m && (
+                      <span style={{ color: '#0ea5e9' }}>{p.nom_cours_eau}: {(p.dist_cours_eau_m / 1000).toFixed(1)}km</span>
+                    )}
+                    {p.dist_route_m && (
+                      <span style={{ color: '#a78bfa' }}>{p.type_route}: {(p.dist_route_m / 1000).toFixed(1)}km</span>
+                    )}
                     {p.future_400kv_buffer && (
                       <span className="px-1 rounded" style={{ background: '#ff004022', color: '#ff4757' }}>
                         400kV {p.future_400kv_buffer}
