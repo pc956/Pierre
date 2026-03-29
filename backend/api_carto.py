@@ -304,8 +304,25 @@ def parse_parcelle_feature(feature: Dict[str, Any]) -> Dict[str, Any]:
             centroid = {"type": "Point", "coordinates": [avg_lon, avg_lat]}
     
     # Build unique parcel ID from cadastral reference fields
-    code_commune = props.get("code_com", "") or props.get("code_insee", "")
-    code_dep = props.get("code_dep", "") or (code_commune[:2] if code_commune else "")
+    # BUG 1 FIX — Reconstruire code_commune complet (5 chiffres = dept + com)
+    code_dep = props.get("code_dep", "")
+    code_com_raw = props.get("code_com", "")
+    code_insee_raw = props.get("code_insee", "")
+
+    if code_insee_raw and len(code_insee_raw) >= 5:
+        code_commune = code_insee_raw
+        code_dep = code_dep or code_commune[:2]
+    elif code_dep and code_com_raw:
+        code_commune = code_dep + code_com_raw
+    elif code_com_raw and len(code_com_raw) >= 5:
+        code_commune = code_com_raw
+        code_dep = code_dep or code_commune[:2]
+    else:
+        code_commune = code_com_raw
+        code_dep = code_dep or (code_commune[:2] if len(code_commune) >= 2 else "")
+
+    if not code_dep and code_commune and len(code_commune) >= 2:
+        code_dep = code_commune[:2]
     section = props.get("section", "")
     numero = props.get("numero", "")
     feuille = props.get("feuille", "1")

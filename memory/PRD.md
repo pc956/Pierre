@@ -12,35 +12,35 @@ Plateforme de prospection foncière pour data centers en France. Interface IA-Fi
 ## Fonctionnalités implémentées
 
 ### V1 MVP
-- [x] Carte Leaflet dark + couches infra (HTB, 400/225kV, LP, câbles, DC)
-- [x] Chatbot IA (GPT-4.1-mini) — interface exclusive
-- [x] Parcelles cadastrales IGN + PLU GPU + S3REnR + Future 400kV + Export PDF + Google Auth
+- [x] Carte Leaflet dark + couches infra + Chatbot IA + Parcelles IGN + PLU GPU + S3REnR + Future 400kV + PDF + Google Auth
 
 ### V2 Refonte (29/03/2026)
 - [x] Score universel /100 (RTE/40, MW/30, PLU/20, Surface/10 + malus)
-- [x] Données réelles: S3REnR, fibre population, Géorisques, DVF Cerema
-- [x] Recherche par commune + parallélisation + cache GPU
-- [x] PDF "Fiche d'Opportunité" + SYSTEM_PROMPT simplifié + Score breakdown + Agrégation adjacentes
+- [x] Données réelles: S3REnR, fibre, Géorisques, DVF Cerema
+- [x] Recherche par commune + parallélisation + cache GPU + SYSTEM_PROMPT + Score breakdown + Agrégation adjacentes + PDF Fiche d'Opportunité
 
-### V2 Correctifs
-- [x] 5 couches carte (zones indus GPU, heatmap MW, inondables, cours d'eau WMS, routes)
-- [x] DVF réel cascade (commune API → dept → région fallback)
-- [x] Nettoyage complet project_type
+### V2-V3 Correctifs
+- [x] 5 couches carte + DVF cascade + Nettoyage project_type
+- [x] Distance cours d'eau + route (Overpass) + Suggestions chatbot + Street View/Satellite + Mode comparaison
 
-### V3 Correctifs
-- [x] Distance cours d'eau (Overpass API) + Distance route principale (Overpass API)
-- [x] Suggestions rapides chatbot (5 pills) + Liens Satellite + Street View
-- [x] Mode comparaison (2-3 parcelles côte-à-côte)
+### V4 Bugfixes agent IA
+- [x] BUG 1: Resume eau/route (recalcul post-Overpass)
+- [x] BUG 2: SYSTEM_PROMPT simplifié (actions obsolètes supprimées)
+- [x] BUG 3: Verdict cohérent après bonus 400kV
+- [x] BUG 4: Fallback sans LLM (_try_direct_parse)
+- [x] BUG 5: Reconstruction code_commune si vide
 
-### V4 Bugfixes agent IA (29/03/2026)
-- [x] BUG 1: Resume contient désormais eau/route (recalcul post-Overpass)
-- [x] BUG 2: SYSTEM_PROMPT simplifié (actions search/site_detail supprimées, fallback vers find_parcels)
-- [x] BUG 3: Verdict cohérent après bonus 400kV (GO correct si score passe 70+)
-- [x] BUG 4: Fallback sans LLM (_try_direct_parse pour requêtes simples)
-- [x] BUG 5: Reconstruction code_commune si vide (via api_search_communes)
+### V5 Bugfixes pipeline (29/03/2026)
+- [x] **BUG CRITIQUE 1**: code_commune = dept(2) + com(3) = 5 chiffres (api_carto.py). Corrige fibre, georisques, DVF pour TOUTES les parcelles.
+- [x] **BUG CRITIQUE 2**: S3REnR matching par aliases manuels HTB→S3REnR (60+ correspondances PACA/IDF/HdF/AuRA) + fallback meilleur poste régional. Champs s3renr_match_method + s3renr_match_poste exposés.
+
+## Impact des fixes V5
+- Scores passent de ~75 à **83-95/100** grâce aux vrais MW S3REnR
+- Fibre estimée correctement (500m-1500m vs 3000m fallback)
+- Resume contient "avec 74 MW disponibles" au lieu de silence
 
 ## Backlog
 - [ ] **P1**: Overlay risques Géorisques vectoriel sur carte
 - [ ] **P2**: Mode COMEX (vue exécutive)
 - [ ] **P2**: Alertes automatiques
-- [ ] **P3**: PDF comparatifs auto (2+ parcelles shortlistées)
+- [ ] **P3**: PDF comparatifs auto

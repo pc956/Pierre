@@ -46,24 +46,75 @@ async def get_gpu_full_context_cached(lon: float, lat: float) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════
-# S3REnR LOOKUP (Étape 2A)
+# S3REnR LOOKUP — Matching amélioré avec aliases (BUG 2 FIX)
 # ═══════════════════════════════════════════════════════════
 
+HTB_TO_S3RENR_ALIASES = {
+    # PACA — Étang de Berre / Marseille
+    "MARIGNANE": ["REALTOR", "ROGNAC"],
+    "VITROLLES": ["REALTOR", "LA DURANNE", "GARDANNE"],
+    "ISTRES": ["RASSUEN", "LAVERA", "LAVALDUC"],
+    "FOS SUR MER": ["PONTEAU", "LAVERA", "RASSUEN", "FEUILLANE"],
+    "FOS": ["PONTEAU", "LAVERA"],
+    "BERRE": ["RASSUEN", "LAVERA", "ROGNAC"],
+    "BERRE L ETANG": ["RASSUEN", "LAVERA", "ROGNAC"],
+    "MARSEILLE NORD": ["ARENC", "SAUMATY", "CHATEAU GOMBERT"],
+    "MARSEILLE": ["ARENC", "SAUMATY", "MAZARGUES"],
+    "AIX EN PROVENCE": ["LA DURANNE", "GARDANNE"],
+    "AIX": ["LA DURANNE", "GARDANNE"],
+    "NICE": ["BROC-CARROS", "TRINITE-VICTOR"],
+    "TOULON": ["SOLLIES", "NEOULES", "ROCBARON"],
+    "AVIGNON": ["SORGUES", "BOLLENE", "PIOLENC"],
+    "SALON DE PROVENCE": ["RASSUEN", "ROGNAC"],
+    "MIRAMAS": ["RASSUEN", "LAVALDUC"],
+    "PORT DE BOUC": ["PONTEAU", "LAVERA"],
+    # IDF
+    "VILLEPINTE": ["VILLENEUVE-ST-GEORGES", "MITRY-MORY"],
+    "ROISSY": ["MITRY-MORY"],
+    "GONESSE": ["MITRY-MORY", "PUTEAUX"],
+    "SAINT DENIS": ["PUTEAUX"],
+    "GENNEVILLIERS": ["PUTEAUX"],
+    "LA COURNEUVE": ["PUTEAUX", "VILLENEUVE-ST-GEORGES"],
+    "CERGY": ["PERSAN", "LES ORMES"],
+    "EVRY": ["MASSY", "JUINE"],
+    "VITRY": ["RUNGIS", "MASSY"],
+    "NANTERRE": ["PUTEAUX"],
+    "VERSAILLES": ["MASSY"],
+    # HdF
+    "LILLE": ["AVELIN", "GAVRELLE"],
+    "DUNKERQUE": ["BROUCKERQUE", "WARANDE"],
+    "VALENCIENNES": ["HORNAING", "AVESNELLES"],
+    "ARRAS": ["GAVRELLE"],
+    "AMIENS": ["ARGOEUVRES"],
+    "BEAUVAIS": ["EPAUX-BEZU"],
+    # AuRA
+    "LYON": ["GENISSIAT", "CUSSET"],
+    "SAINT ETIENNE": ["PRATCLAUX"],
+    "GRENOBLE": ["MONTEYNARD"],
+}
+
+
 def get_s3renr_for_htb(nearest_htb_name: str, region: str) -> dict:
-    """Find S3REnR data for the nearest HTB substation"""
+    """Find S3REnR data for the nearest HTB substation — matching amélioré"""
     from s3renr_data import S3RENR_DATA
     region_data = S3RENR_DATA.get(region, {})
     postes = region_data.get("postes", {})
 
-    # Normalize substation name
+    if not postes:
+        status = region_data.get("status_global", "")
+        if status == "SATURE":
+            return {"etat": "sature", "mw_dispo": 0, "renforcement": None, "score_dc": 1, "match_method": "region_sature"}
+        return {"etat": "inconnu", "mw_dispo": 0, "renforcement": None, "score_dc": 5, "match_method": "no_postes"}
+
+    # 1. Normaliser le nom HTB
     norm = nearest_htb_name.upper()
     for prefix in ["POSTE "]:
         norm = norm.replace(prefix, "")
     for suffix in ["225KV", "400KV", "63KV", "150KV", "90KV"]:
         norm = norm.replace(suffix, "").strip()
-
-    # Search for match
     norm_htb = norm.replace("-", " ").replace("'", " ").strip()
+
+    # 2. Match direct par nom
     for poste_name, poste_data in postes.items():
         norm_s3 = poste_name.upper().replace("-", " ").replace("'", " ").strip()
         if norm_s3 in norm_htb or norm_htb in norm_s3:
@@ -72,13 +123,65 @@ def get_s3renr_for_htb(nearest_htb_name: str, region: str) -> dict:
                 "mw_dispo": poste_data.get("mw_dispo", 0),
                 "renforcement": poste_data.get("renforcement"),
                 "score_dc": poste_data.get("score_dc", 5),
+                "match_method": "name_direct",
+                "match_poste": poste_name,
             }
 
-    # Fallback région
+    # 3. Alias manuels
+    aliases = HTB_TO_S3RENR_ALIASES.get(norm_htb, [])
+    if not aliases:
+        for alias_key in HTB_TO_S3RENR_ALIASES:
+            if alias_key in norm_htb or norm_htb in alias_key:
+                aliases = HTB_TO_S3RENR_ALIASES[alias_key]
+                break
+
+    if aliases:
+        best_match = None
+        best_mw = -1
+        for alias in aliases:
+            alias_upper = alias.upper()
+            for poste_name, poste_data in postes.items():
+                if poste_name.upper() == alias_upper:
+                    mw = poste_data.get("mw_dispo", 0)
+                    if mw > best_mw:
+                        best_mw = mw
+                        best_match = (poste_name, poste_data)
+        if best_match:
+            poste_name, poste_data = best_match
+            return {
+                "etat": poste_data.get("etat", "inconnu"),
+                "mw_dispo": poste_data.get("mw_dispo", 0),
+                "renforcement": poste_data.get("renforcement"),
+                "score_dc": poste_data.get("score_dc", 5),
+                "match_method": "alias",
+                "match_poste": poste_name,
+            }
+
+    # 4. Fallback : meilleur poste de la région
+    best_regional = None
+    best_mw = -1
+    for poste_name, poste_data in postes.items():
+        mw = poste_data.get("mw_dispo", 0)
+        if mw > best_mw:
+            best_mw = mw
+            best_regional = (poste_name, poste_data)
+
+    if best_regional:
+        poste_name, poste_data = best_regional
+        return {
+            "etat": poste_data.get("etat", "inconnu"),
+            "mw_dispo": round(best_mw * 0.5),
+            "renforcement": None,
+            "score_dc": 5,
+            "match_method": "regional_best",
+            "match_poste": f"~{poste_name} (estimé)",
+        }
+
+    # 5. Fallback ultime
     status = region_data.get("status_global", "")
     if status == "SATURE":
-        return {"etat": "sature", "mw_dispo": 0, "renforcement": None, "score_dc": 1}
-    return {"etat": "inconnu", "mw_dispo": 0, "renforcement": None, "score_dc": 5}
+        return {"etat": "sature", "mw_dispo": 0, "renforcement": None, "score_dc": 1, "match_method": "region_sature"}
+    return {"etat": "inconnu", "mw_dispo": 0, "renforcement": None, "score_dc": 5, "match_method": "no_match"}
 
 
 # ═══════════════════════════════════════════════════════════
@@ -238,6 +341,8 @@ async def _enrich_parcel(parsed: dict, infra: dict, params: dict) -> dict:
     parsed["zone_saturation"] = s3renr["etat"]
     parsed["mw_dispo"] = s3renr["mw_dispo"]
     parsed["renforcement_prevu"] = s3renr.get("renforcement")
+    parsed["s3renr_match_method"] = s3renr.get("match_method", "")
+    parsed["s3renr_match_poste"] = s3renr.get("match_poste", "")
 
     # ── Fibre réelle (Étape 2B) ──
     code_commune = parsed.get("code_commune", "")
@@ -556,6 +661,8 @@ async def _find_real_parcels(params: dict) -> dict:
             "zone_saturation": p.get("zone_saturation", "inconnu"),
             "mw_dispo": p.get("mw_dispo", 0),
             "renforcement_prevu": p.get("renforcement_prevu"),
+            "s3renr_match_method": p.get("s3renr_match_method", ""),
+            "s3renr_match_poste": p.get("s3renr_match_poste", ""),
             "dist_landing_point_km": p.get("dist_landing_point_km", 0),
             "landing_point_nom": p.get("landing_point_nom", ""),
             "landing_point_nb_cables": p.get("landing_point_nb_cables", 0),
