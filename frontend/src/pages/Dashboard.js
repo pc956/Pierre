@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { 
-  Server, Map as MapIcon, Table, Bell, LogOut, 
+  Server, Map as MapIcon, Bell, LogOut, Building2,
   ChevronDown, TrendingUp, AlertTriangle, CheckCircle, XCircle,
   Layers, Eye, EyeOff, ExternalLink, X, Loader, Menu, FileDown
 } from 'lucide-react';
@@ -166,7 +166,6 @@ function VerdictBadge({ verdict }) {
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeView, setActiveView] = useState('map');
   const [loading, setLoading] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState(null);
   const [projectType, setProjectType] = useState('colocation_t3');
@@ -263,12 +262,39 @@ export default function Dashboard() {
     }
   }, [selectedParcel, isMobile]);
   
-  // France parcels only (no more seed parcels)
-  const allParcels = franceParcels;
-  
-  // Apply advanced filters client-side
   // All parcels displayed — filtering done via AI chatbot
-  const filteredParcels = allParcels;
+  const filteredParcels = franceParcels;
+
+  // Load parcels around a geographic point (used by poste HTB / landing point popups)
+  const loadParcelsAroundPoint = useCallback(async (lon, lat, radiusMeters, label) => {
+    const delta = radiusMeters / 111000; // rough degree conversion
+    const bounds = {
+      min_lon: lon - delta,
+      min_lat: lat - delta,
+      max_lon: lon + delta,
+      max_lat: lat + delta,
+      zoom: 15,
+    };
+    setBboxLoading(true);
+    try {
+      const response = await axios.get(
+        `${API}/france/parcelles/bbox?min_lon=${bounds.min_lon}&min_lat=${bounds.min_lat}&max_lon=${bounds.max_lon}&max_lat=${bounds.max_lat}&project_type=${projectType}&limit=200`
+      );
+      const newParcels = response.data.parcelles || [];
+      setFranceParcels(prev => {
+        const existing = new Set(prev.map(p => p.parcel_id));
+        const unique = newParcels.filter(p => !existing.has(p.parcel_id));
+        if (unique.length === 0) return prev;
+        return [...prev, ...unique];
+      });
+      setFlyTrigger(t => t + 1);
+      setChatFlyTarget({ lat, lng: lon, zoom: 14 });
+    } catch (error) {
+      console.error(`Erreur chargement parcelles autour de ${label}:`, error);
+    } finally {
+      setBboxLoading(false);
+    }
+  }, [projectType]);
 
   const fetchMapLayers = async () => {
     try {
@@ -327,20 +353,12 @@ export default function Dashboard() {
               <span className="font-bold text-sm md:text-base" style={{ color: '#e8e8ed' }}>COCKPIT IMMO</span>
             </div>
             
-            {/* Navigation - desktop */}
+            {/* Mode indicator */}
             {!isMobile && (
-              <nav className="flex items-center gap-1 ml-8">
-                <button
-                  onClick={() => setActiveView('map')}
-                  className={`h-8 px-3 flex items-center gap-2 text-xs font-mono uppercase transition-colors ${
-                    activeView === 'map' ? 'text-[#00d4aa] border-b-2 border-[#00d4aa]' : 'text-[#8f8f9d] hover:text-[#e8e8ed]'
-                  }`}
-                  data-testid="nav-map"
-                >
-                  <MapIcon size={14} />
-                  Carte
-                </button>
-            </nav>
+              <span className="ml-8 h-8 px-3 flex items-center gap-2 text-xs font-mono uppercase text-[#00d4aa] border-b-2 border-[#00d4aa]" data-testid="nav-map">
+                <MapIcon size={14} />
+                Carte
+              </span>
             )}
           </div>
 
@@ -431,7 +449,6 @@ export default function Dashboard() {
 
         {/* Main content area */}
         <div className="flex-1 flex overflow-hidden relative">
-          {activeView === 'map' && (
             <>
               {/* Map - full width on mobile */}
               <div className="flex-1 relative">
@@ -1010,7 +1027,6 @@ export default function Dashboard() {
               </div>
               )}
             </>
-          )}
 
         </div>
       </div>
@@ -1035,39 +1051,6 @@ export default function Dashboard() {
             <LayerToggle label="DC existants" color="#8b5cf6" icon="■" active={layers.dc_existants} onClick={() => toggleLayer('dc_existants')} />
             <LayerToggle label="400kV Future" color="#ff0040" icon="⚡" active={layers.rte_future_400kv} onClick={() => toggleLayer('rte_future_400kv')} />
           </div>
-        </div>
-      )}
-
-      {/* Mobile Bottom Navigation */}
-      {isMobile && !mobilePanel && !selectedParcel && (
-        <div 
-          className="fixed left-0 right-0 z-[1001] flex items-center justify-around py-2"
-          style={{ background: '#12121a', borderTop: '1px solid #1f1f2e', bottom: 0 }}
-        >
-          <button
-            onClick={() => setActiveView('map')}
-            className={`flex flex-col items-center gap-0.5 px-4 py-1 ${activeView === 'map' ? 'text-[#00d4aa]' : 'text-[#8f8f9d]'}`}
-            data-testid="mobile-nav-map"
-          >
-            <MapIcon size={18} />
-            <span className="text-[10px] font-mono">Carte</span>
-          </button>
-          <button
-            onClick={() => setActiveView('table')}
-            className={`flex flex-col items-center gap-0.5 px-4 py-1 ${activeView === 'table' ? 'text-[#00d4aa]' : 'text-[#8f8f9d]'}`}
-            data-testid="mobile-nav-table"
-          >
-            <Table size={18} />
-            <span className="text-[10px] font-mono">Tableau</span>
-          </button>
-          <button
-            onClick={() => setMobileSidebar(!mobileSidebar)}
-            className={`flex flex-col items-center gap-0.5 px-4 py-1 ${mobileSidebar ? 'text-[#00d4aa]' : 'text-[#8f8f9d]'}`}
-            data-testid="mobile-nav-info"
-          >
-            <TrendingUp size={18} />
-            <span className="text-[10px] font-mono">Stats</span>
-          </button>
         </div>
       )}
 
@@ -1826,82 +1809,6 @@ function ScoreBar({ label, value, max }) {
       <span className="w-10 text-right text-xs font-mono" style={{ color: '#e8e8ed' }}>
         {(value || 0).toFixed(0)}
       </span>
-    </div>
-  );
-}
-
-// Parcels Table
-function ParcelsTable({ parcels, projectType, onSelect }) {
-  const sortedParcels = [...parcels].sort((a, b) => 
-    (b.score?.score_net || 0) - (a.score?.score_net || 0)
-  );
-
-  return (
-    <div className="panel overflow-hidden">
-      <div className="panel-header">
-        <span className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>
-          {parcels.length} sites · {projectType.replace('_', ' ')}
-        </span>
-      </div>
-      <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-        <table className="data-table text-xs md:text-sm">
-          <thead>
-            <tr>
-              <th>Commune</th>
-              <th className="hidden md:table-cell">Région</th>
-              <th>Verdict</th>
-              <th>Score</th>
-              <th>PLU</th>
-              <th className="hidden md:table-cell">MW P50</th>
-              <th className="hidden md:table-cell">TTM</th>
-              <th className="hidden lg:table-cell">DFI</th>
-              <th className="hidden lg:table-cell">IRR Lev</th>
-              <th className="hidden lg:table-cell">CAPEX</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedParcels.map(parcel => {
-              const score = parcel.score || {};
-              return (
-                <tr 
-                  key={parcel.parcel_id}
-                  onClick={() => onSelect(parcel)}
-                  className="cursor-pointer"
-                >
-                  <td style={{ color: '#e8e8ed' }}>{parcel.commune}</td>
-                  <td className="hidden md:table-cell" style={{ color: '#8f8f9d' }}>{parcel.region}</td>
-                  <td><VerdictBadge verdict={score.verdict} /></td>
-                  <td style={{ color: getScoreColor(score.score_net || 0) }}>
-                    {(score.score_net || 0).toFixed(0)}
-                  </td>
-                  <td>
-                    <span className="font-mono" style={{ 
-                      color: parcel.plu_zone === 'U' ? '#2ed573' 
-                           : parcel.plu_zone === 'AU' ? '#ffa502' 
-                           : parcel.plu_zone === 'A' ? '#8b5cf6'
-                           : parcel.plu_zone === 'N' ? '#3b82f6' 
-                           : '#8f8f9d' 
-                    }}>
-                      {parcel.plu_zone || '?'}
-                    </span>
-                  </td>
-                  <td className="hidden md:table-cell" style={{ color: '#00d4aa' }}>{score.power_mw_p50?.toFixed(1) || '-'}</td>
-                  <td className="hidden md:table-cell" style={{ color: '#3b82f6' }}>
-                    {score.ttm_min_months || '-'}-{score.ttm_max_months || '-'}
-                  </td>
-                  <td className="hidden lg:table-cell" style={{ color: (score.urba_deal_friction_index || 0) < 30 ? '#00d4aa' : '#ffa502' }}>
-                    {score.urba_deal_friction_index || 0}
-                  </td>
-                  <td className="hidden lg:table-cell" style={{ color: '#00d4aa' }}>{score.irr_levered_pct?.toFixed(1) || '-'}%</td>
-                  <td className="hidden lg:table-cell" style={{ color: '#e8e8ed' }}>
-                    {score.capex_p50 ? `${(score.capex_p50 / 1e6).toFixed(0)}M` : '-'}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }
