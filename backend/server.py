@@ -302,21 +302,23 @@ async def get_parcels(
     
     parcels = await db.parcels.find(query, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
     
-    # Get scores for each parcel
+    if not parcels:
+        return {"parcels": [], "count": 0}
+    
+    # Batch fetch scores using $in operator (optimized — no N+1)
+    parcel_ids = [p["parcel_id"] for p in parcels]
+    score_docs = await db.parcel_scores.find(
+        {"parcel_id": {"$in": parcel_ids}, "project_type": project_type, "is_latest": True},
+        {"_id": 0}
+    ).to_list(len(parcel_ids))
+    score_map = {s["parcel_id"]: s for s in score_docs}
+    
     result = []
     for parcel in parcels:
-        score_doc = await db.parcel_scores.find_one(
-            {"parcel_id": parcel["parcel_id"], "project_type": project_type, "is_latest": True},
-            {"_id": 0}
-        )
-        
+        score_doc = score_map.get(parcel["parcel_id"])
         if score_min and score_doc and score_doc.get("score_net", 0) < score_min:
             continue
-        
-        result.append({
-            **parcel,
-            "score": score_doc
-        })
+        result.append({**parcel, "score": score_doc})
     
     return {"parcels": result, "count": len(result)}
 
@@ -1246,10 +1248,20 @@ async def get_shortlists(request: Request):
         {"_id": 0}
     ).to_list(100)
     
-    # Count items per shortlist
+    if not shortlists:
+        return {"shortlists": []}
+    
+    # Batch count items per shortlist using aggregation (optimized — no N+1)
+    sl_ids = [sl["shortlist_id"] for sl in shortlists]
+    pipeline = [
+        {"$match": {"shortlist_id": {"$in": sl_ids}}},
+        {"$group": {"_id": "$shortlist_id", "count": {"$sum": 1}}},
+    ]
+    counts = await db.shortlist_items.aggregate(pipeline).to_list(len(sl_ids))
+    count_map = {c["_id"]: c["count"] for c in counts}
+    
     for sl in shortlists:
-        count = await db.shortlist_items.count_documents({"shortlist_id": sl["shortlist_id"]})
-        sl["item_count"] = count
+        sl["item_count"] = count_map.get(sl["shortlist_id"], 0)
     
     return {"shortlists": shortlists}
 
@@ -1292,21 +1304,34 @@ async def get_shortlist(shortlist_id: str, request: Request):
         {"_id": 0}
     ).to_list(100)
     
-    # Enrich items with parcel data
+    if not items:
+        return {**shortlist, "items": []}
+    
+    # Batch fetch parcel data and scores (optimized — no N+1)
+    parcel_ids = [item["parcel_id"] for item in items]
+    
+    parcels_cursor = db.parcels.find(
+        {"parcel_id": {"$in": parcel_ids}},
+        {"_id": 0, "parcel_id": 1, "commune": 1, "region": 1, "surface_ha": 1}
+    )
+    parcels_list = await parcels_cursor.to_list(len(parcel_ids))
+    parcel_map = {p["parcel_id"]: p for p in parcels_list}
+    
+    scores_cursor = db.parcel_scores.find(
+        {"parcel_id": {"$in": parcel_ids}, "project_type": shortlist.get("project_type", "colocation_t3"), "is_latest": True},
+        {"_id": 0, "parcel_id": 1, "score_net": 1, "verdict": 1, "power_mw_p50": 1, "ttm_max_months": 1}
+    )
+    scores_list = await scores_cursor.to_list(len(parcel_ids))
+    score_map = {s["parcel_id"]: s for s in scores_list}
+    
     for item in items:
-        parcel = await db.parcels.find_one(
-            {"parcel_id": item["parcel_id"]},
-            {"_id": 0, "commune": 1, "region": 1, "surface_ha": 1}
-        )
-        if parcel:
-            item["parcel"] = parcel
-        
-        score = await db.parcel_scores.find_one(
-            {"parcel_id": item["parcel_id"], "project_type": shortlist.get("project_type", "colocation_t3"), "is_latest": True},
-            {"_id": 0, "score_net": 1, "verdict": 1, "power_mw_p50": 1, "ttm_max_months": 1}
-        )
-        if score:
-            item["score"] = score
+        pid = item["parcel_id"]
+        parcel_data = parcel_map.get(pid)
+        if parcel_data:
+            item["parcel"] = {k: v for k, v in parcel_data.items() if k != "parcel_id"}
+        score_data = score_map.get(pid)
+        if score_data:
+            item["score"] = {k: v for k, v in score_data.items() if k != "parcel_id"}
     
     return {**shortlist, "items": items}
 

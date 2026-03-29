@@ -70,6 +70,7 @@ export default function ChatBot({ onFlyTo, onHighlightSites, onSelectParcelFromC
         total_found: data.total_found,
         returned: data.returned,
         params: data.params,
+        filters_applied: data.filters_applied,
       }]);
       if (data.fly_to && onFlyTo) {
         onFlyTo(data.fly_to.lat, data.fly_to.lng, data.fly_to.zoom);
@@ -341,6 +342,41 @@ function ChatMessage({ msg, onSiteClick, onParcelClick }) {
               <span>{msg.total_found} parcelles trouvées</span>
               <span>{msg.returned} affichées</span>
             </div>
+            {/* Active filters summary */}
+            {msg.filters_applied && (
+              <div className="flex flex-wrap gap-1 text-[9px]">
+                {msg.filters_applied.min_surface_ha > 0 && (
+                  <span className="px-1.5 py-0.5 rounded" style={{ background: '#00d4aa15', color: '#00d4aa', border: '1px solid #00d4aa33' }}>
+                    ≥{msg.filters_applied.min_surface_ha}ha
+                  </span>
+                )}
+                {msg.filters_applied.max_surface_ha && (
+                  <span className="px-1.5 py-0.5 rounded" style={{ background: '#00d4aa15', color: '#00d4aa', border: '1px solid #00d4aa33' }}>
+                    ≤{msg.filters_applied.max_surface_ha}ha
+                  </span>
+                )}
+                {msg.filters_applied.max_dist_htb_km && (
+                  <span className="px-1.5 py-0.5 rounded" style={{ background: '#ffa50215', color: '#ffa502', border: '1px solid #ffa50233' }}>
+                    HTB≤{msg.filters_applied.max_dist_htb_km}km
+                  </span>
+                )}
+                {msg.filters_applied.min_tension_kv && (
+                  <span className="px-1.5 py-0.5 rounded" style={{ background: '#ff004015', color: '#ff4757', border: '1px solid #ff004033' }}>
+                    ≥{msg.filters_applied.min_tension_kv}kV
+                  </span>
+                )}
+                {msg.filters_applied.max_dist_future_line_km && (
+                  <span className="px-1.5 py-0.5 rounded" style={{ background: '#ff004015', color: '#ff4757', border: '1px solid #ff004033' }}>
+                    400kV≤{msg.filters_applied.max_dist_future_line_km}km
+                  </span>
+                )}
+                {msg.filters_applied.plu_zones && (
+                  <span className="px-1.5 py-0.5 rounded" style={{ background: '#3b82f615', color: '#3b82f6', border: '1px solid #3b82f633' }}>
+                    PLU: {msg.filters_applied.plu_zones.join(', ')}
+                  </span>
+                )}
+              </div>
+            )}
             {msg.sites_searched && msg.sites_searched.length > 0 && (
               <div className="text-[10px] px-2 py-1 rounded" style={{ background: '#0a0a0f', border: '1px solid #1f1f2e', color: '#8f8f9d' }}>
                 Recherche autour de : {msg.sites_searched.map(s => `${s.name} (${s.grid.mw_dispo}MW)`).join(', ')}

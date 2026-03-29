@@ -37,13 +37,27 @@ Paramètres à extraire:
 - region: "IDF"|"PACA"|"HdF"|"AuRA"|"BRE"|"GES"|"NOR"|"NAQ"|"OCC"|"PDL" (null si pas spécifié)
 - max_delay_months: délai max raccordement (défaut: 36)
 - min_surface_ha: surface minimum en hectares (défaut: 1.0)
+- max_surface_ha: surface maximum en hectares (null = pas de max)
 - max_dist_htb_km: distance max au poste HTB en km (défaut: 5)
-- plu_zones: liste de zones PLU acceptées, ex: ["U", "AU", "AUx"] (null = toutes)
+- min_tension_kv: tension HTB minimum en kV (null = pas de min, 225 ou 400 si demandé)
+- max_dist_future_line_km: distance max à la future ligne 400kV en km (null = pas de filtre)
+- plu_zones: liste de zones PLU acceptées (null = toutes). Valeurs: "U" (urbanisé), "AU" (à urbaniser), "AUx", "Ux", "UI" (zone industrielle), "N" (naturelle), "A" (agricole)
 - brownfield_only: true si brownfield/industriel uniquement (défaut: false)
 - grid_priority: true si réseau dispo souhaité (défaut: false)
 - strategy: "speed"|"cost"|"power"|"balanced" (défaut: "balanced")
 - nb_parcels: nombre max de parcelles à retourner (défaut: 10, max: 20)
-- search_radius_m: rayon de recherche autour des postes HTB en mètres (défaut: 2000)
+- search_radius_m: rayon de recherche autour des postes HTB en mètres (défaut: 2000, max: 5000)
+
+EXEMPLES DE MAPPING:
+- "parcelles en zone UI" ou "zone industrielle" → plu_zones: ["U", "UI", "Ux"]
+- "zone à urbaniser" → plu_zones: ["AU", "AUx"]
+- "terrain de 5 hectares minimum" → min_surface_ha: 5
+- "entre 2 et 10 hectares" → min_surface_ha: 2, max_surface_ha: 10
+- "à moins de 3km d'un poste" → max_dist_htb_km: 3
+- "à moins de 2km de la future ligne" ou "proche future 400kV" → max_dist_future_line_km: 2
+- "poste 400kV uniquement" → min_tension_kv: 400
+- "poste 225kV ou plus" → min_tension_kv: 225
+- "rayon 3km" ou "cherche dans 3km" → search_radius_m: 3000
 
 2. action: "search" — Recherche de SITES DC (vue macro, sans parcelles exactes)
 Utilise seulement si l'utilisateur demande une vue d'ensemble ou des sites, pas des terrains précis.
@@ -126,10 +140,14 @@ async def _find_real_parcels(params: dict) -> dict:
     if not top_sites:
         return {"parcels": [], "sites_searched": 0, "message": "Aucun poste HTB correspondant trouvé."}
     
-    search_radius = params.get("search_radius_m", 2000)
+    search_radius = min(params.get("search_radius_m", 2000), 5000)
     min_surface_ha = params.get("min_surface_ha", 1.0)
+    max_surface_ha = params.get("max_surface_ha")
     nb_parcels_max = min(params.get("nb_parcels", 10), 20)
     plu_zones = params.get("plu_zones")
+    max_dist_htb_m = params.get("max_dist_htb_km", 5) * 1000
+    min_tension_kv = params.get("min_tension_kv")
+    max_dist_future_line_m = (params.get("max_dist_future_line_km") or 0) * 1000 if params.get("max_dist_future_line_km") else None
     
     all_parcels = []
     sites_searched = []
@@ -173,6 +191,10 @@ async def _find_real_parcels(params: dict) -> dict:
             if surface_ha < min_surface_ha:
                 continue
             
+            # Filter by max surface
+            if max_surface_ha and surface_ha > max_surface_ha:
+                continue
+            
             # Compute distances
             min_dist_htb = 999999
             nearest_htb_kv = 0
@@ -202,6 +224,14 @@ async def _find_real_parcels(params: dict) -> dict:
             parsed["dist_backbone_fibre_m"] = 2000
             parsed["nb_operateurs_fibre"] = 2
             
+            # Filter by max distance to HTB
+            if min_dist_htb > max_dist_htb_m:
+                continue
+            
+            # Filter by min tension
+            if min_tension_kv and nearest_htb_kv < min_tension_kv:
+                continue
+            
             # DVF
             code_dep = parsed.get("departement", "")
             if code_dep:
@@ -230,6 +260,10 @@ async def _find_real_parcels(params: dict) -> dict:
             parsed["dist_future_400kv_m"] = round(dist_future)
             parsed["future_400kv_buffer"] = get_buffer_zone(plon, plat)
             parsed["future_400kv_score_bonus"] = score_future_400kv(plon, plat)
+            
+            # Filter by max distance to future line
+            if max_dist_future_line_m and dist_future > max_dist_future_line_m:
+                continue
             
             # Compute score
             parsed["zone_saturation"] = "inconnu"
@@ -296,6 +330,15 @@ async def _find_real_parcels(params: dict) -> dict:
         "sites_searched": sites_searched,
         "total_found": len(unique_parcels),
         "returned": len(clean_parcels),
+        "filters_applied": {
+            "min_surface_ha": min_surface_ha,
+            "max_surface_ha": max_surface_ha,
+            "max_dist_htb_km": max_dist_htb_m / 1000,
+            "min_tension_kv": min_tension_kv,
+            "max_dist_future_line_km": params.get("max_dist_future_line_km"),
+            "plu_zones": plu_zones,
+            "search_radius_m": search_radius,
+        },
     }
 
 
@@ -359,6 +402,7 @@ async def process_chat_message(
                     "returned": result["returned"],
                     "fly_to": fly_to,
                     "params": params,
+                    "filters_applied": result.get("filters_applied", {}),
                 }
             except Exception as e:
                 logger.error(f"find_parcels error: {e}")
