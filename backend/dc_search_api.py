@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 
 from france_infra_data import get_all_france_infra
 from s3renr_data import S3RENR_DATA
+from rte_future_line import distance_to_future_line, get_buffer_zone, score_future_400kv, compute_future_grid_potential
 
 logger = logging.getLogger("dc_search")
 
@@ -207,6 +208,12 @@ def _build_all_sites() -> List[Dict[str, Any]]:
         # City name from poste name
         city = nom.replace("Poste ", "").split(" ")[0]
 
+        # Future 400kV line data
+        dist_future = distance_to_future_line(lon, lat)
+        future_buffer = get_buffer_zone(lon, lat)
+        future_bonus = score_future_400kv(lon, lat)
+        future_grid = compute_future_grid_potential(lon, lat, dist_poste_htb_m=500, s3renr_mw_dispo=mw_dispo, s3renr_etat=etat)
+
         sites.append({
             "site_id": f"dc_{asset_id}",
             "name": f"Site {city} — {_voltage_label(tension)}",
@@ -223,7 +230,7 @@ def _build_all_sites() -> List[Dict[str, Any]]:
                 "type": land_type,
             },
             "grid": {
-                "distance_to_substation_km": 0.5,  # Site adjacent to substation
+                "distance_to_substation_km": 0.5,
                 "voltage_level": _voltage_label(tension),
                 "estimated_capacity_mw": round(mw_capacity, 0),
                 "available_capacity_mw": round(mw_dispo, 0),
@@ -231,6 +238,12 @@ def _build_all_sites() -> List[Dict[str, Any]]:
                 "reinforcement_planned": renforcement is not None,
                 "reinforcement_detail": renforcement,
                 "etat_s3renr": etat,
+            },
+            "future_400kv": {
+                "distance_m": round(dist_future),
+                "buffer_zone": future_buffer,
+                "score_bonus": future_bonus,
+                "future_grid_potential": future_grid,
             },
             "timeline": {
                 "estimated_connection_delay_months": round(avg_delay),
@@ -351,12 +364,18 @@ def _score_site(site: Dict, params: Dict) -> Dict[str, Any]:
     risk_score = max(0, risk_score)
 
     # ── GLOBAL SCORE ──
+    # Add future 400kV bonus
+    future_bonus = site.get("future_400kv", {}).get("score_bonus", 0)
+    future_bonus_normalized = future_bonus / 30 * 10  # Normalize to 0-10 bonus
+
     global_score = (
         weights["power"] * power_score
         + weights["speed"] * speed_score
         + weights["cost"] * cost_score
         + weights["risk"] * risk_score
+        + future_bonus_normalized
     )
+    global_score = min(100, global_score)
 
     return {
         "global": round(global_score, 1),
@@ -364,6 +383,7 @@ def _score_site(site: Dict, params: Dict) -> Dict[str, Any]:
         "speed": round(speed_score, 1),
         "cost": round(cost_score, 1),
         "risk": round(risk_score, 1),
+        "future_400kv_bonus": round(future_bonus_normalized, 1),
     }
 
 
@@ -383,7 +403,7 @@ def _generate_comment(site: Dict, score: Dict, params: Dict) -> str:
     elif mw > 0:
         parts.append(f"Capacité partielle ({mw} MW dispo sur {mw_target} MW visés)")
     else:
-        parts.append(f"Aucune capacité disponible (réseau saturé)")
+        parts.append("Aucune capacité disponible (réseau saturé)")
 
     # Grid status
     if grid["etat_s3renr"] == "disponible":
@@ -408,6 +428,11 @@ def _generate_comment(site: Dict, score: Dict, params: Dict) -> str:
     # Risk
     if score["risk"] < 50:
         parts.append("Risque administratif élevé")
+
+    # Future 400kV line
+    future = site.get("future_400kv", {})
+    if future.get("buffer_zone"):
+        parts.append(f"Proximité future ligne 400kV Fos→Jonquières ({future['buffer_zone']}, +{future['score_bonus']}pts)")
 
     return ". ".join(parts) + "."
 
@@ -434,6 +459,8 @@ def _generate_tags(site: Dict, score: Dict, params: Dict) -> List[str]:
         tags.append("brownfield")
     if site["urbanism"]["data_center_compatible"]:
         tags.append("plu_compatible")
+    if site.get("future_400kv", {}).get("buffer_zone"):
+        tags.append("future_400kv_proximity")
     if score["global"] >= 80:
         tags.append("top_site")
     elif score["global"] >= 60:
@@ -516,6 +543,7 @@ def dc_search(params: Dict) -> Dict[str, Any]:
                 "permitting_risk": site["timeline"]["permitting_risk"],
             },
             "urbanism": site["urbanism"],
+            "future_400kv": site.get("future_400kv"),
             "score": score,
             "tags": tags,
             "comment": comment,

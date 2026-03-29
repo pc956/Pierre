@@ -186,6 +186,9 @@ export default function Dashboard() {
   const [electricalAssets, setElectricalAssets] = useState([]);
   const [s3renrSummary, setS3renrSummary] = useState([]);
   
+  // RTE Future 400kV line data
+  const [futureLine400kv, setFutureLine400kv] = useState(null);
+  
   // Layer visibility
   const [showLayers, setShowLayers] = useState(false);
   const [layers, setLayers] = useState({
@@ -196,6 +199,7 @@ export default function Dashboard() {
     landing_points: true,
     submarine_cables: true,
     dc_existants: true,
+    rte_future_400kv: true,
   });
   
   // SIREN modal
@@ -382,18 +386,20 @@ export default function Dashboard() {
 
   const fetchMapLayers = async () => {
     try {
-      const [lpRes, dcRes, cablesRes, elecRes, s3renrRes] = await Promise.all([
+      const [lpRes, dcRes, cablesRes, elecRes, s3renrRes, futureLineRes] = await Promise.all([
         axios.get(`${API}/map/landing-points`),
         axios.get(`${API}/map/dc`),
         axios.get(`${API}/map/submarine-cables`),
         axios.get(`${API}/map/electrical-assets`),
         axios.get(`${API}/s3renr/summary`),
+        axios.get(`${API}/map/rte-future-400kv`),
       ]);
       setLandingPoints(lpRes.data.landing_points || []);
       setDcExistants(dcRes.data.dc_existants || []);
       setSubmarineCables(cablesRes.data.submarine_cables || []);
       setElectricalAssets(elecRes.data.electrical_assets || []);
       setS3renrSummary(s3renrRes.data.summary || []);
+      setFutureLine400kv(futureLineRes.data || null);
     } catch (error) {
       console.error('Error fetching map layers:', error);
     }
@@ -831,6 +837,55 @@ export default function Dashboard() {
                     onZoomChange={setMapZoom}
                   />
                     
+                    {/* RTE Future 400kV Line + Buffers */}
+                    {layers.rte_future_400kv && futureLine400kv && (
+                      <>
+                        {/* Buffer 5km (bottom layer) */}
+                        {futureLine400kv.buffers?.['5km']?.coordinates?.[0] && (
+                          <LeafletPolygon
+                            positions={futureLine400kv.buffers['5km'].coordinates[0].map(c => [c[1], c[0]])}
+                            pathOptions={{ color: '#ffd32a', fillColor: '#ffd32a', fillOpacity: 0.08, weight: 1, opacity: 0.4, dashArray: '4,4' }}
+                          >
+                            <Popup><div className="p-2"><p className="font-bold text-xs">Zone opportunité (5 km)</p><p className="text-xs text-gray-400">Ligne future 400kV Fos → Jonquières</p></div></Popup>
+                          </LeafletPolygon>
+                        )}
+                        {/* Buffer 3km */}
+                        {futureLine400kv.buffers?.['3km']?.coordinates?.[0] && (
+                          <LeafletPolygon
+                            positions={futureLine400kv.buffers['3km'].coordinates[0].map(c => [c[1], c[0]])}
+                            pathOptions={{ color: '#ffa502', fillColor: '#ffa502', fillOpacity: 0.12, weight: 1, opacity: 0.5, dashArray: '4,4' }}
+                          >
+                            <Popup><div className="p-2"><p className="font-bold text-xs">Zone stratégique (3 km)</p><p className="text-xs text-gray-400">Ligne future 400kV Fos → Jonquières</p></div></Popup>
+                          </LeafletPolygon>
+                        )}
+                        {/* Buffer 1km */}
+                        {futureLine400kv.buffers?.['1km']?.coordinates?.[0] && (
+                          <LeafletPolygon
+                            positions={futureLine400kv.buffers['1km'].coordinates[0].map(c => [c[1], c[0]])}
+                            pathOptions={{ color: '#ff4757', fillColor: '#ff4757', fillOpacity: 0.20, weight: 1, opacity: 0.6 }}
+                          >
+                            <Popup><div className="p-2"><p className="font-bold text-xs">Zone chaude (1 km)</p><p className="text-xs text-gray-400">Potentiel raccordement futur élevé</p></div></Popup>
+                          </LeafletPolygon>
+                        )}
+                        {/* The line itself */}
+                        <Polyline
+                          positions={futureLine400kv.line.coordinates.map(c => [c[1], c[0]])}
+                          pathOptions={{ color: '#ff0040', weight: 3.5, opacity: 0.95, dashArray: '12,6' }}
+                        >
+                          <Popup>
+                            <div className="p-2" style={{ minWidth: 240 }}>
+                              <p className="font-bold text-sm">{futureLine400kv.metadata?.nom}</p>
+                              <p className="text-xs text-gray-400 mt-1">
+                                {futureLine400kv.metadata?.tension_kv} kV · Mise en service : {futureLine400kv.metadata?.mise_en_service_estimee}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">{futureLine400kv.metadata?.description}</p>
+                              <p className="text-[10px] text-gray-500 mt-1 italic">Source : {futureLine400kv.metadata?.source}</p>
+                            </div>
+                          </Popup>
+                        </Polyline>
+                      </>
+                    )}
+
                     {/* Submarine cables */}
                     {layers.submarine_cables && submarineCables.map(cable => (
                       <Polyline
@@ -1049,6 +1104,11 @@ export default function Dashboard() {
                                 <p className="font-bold text-sm">{parcel.commune}</p>
                                 <p className="text-xs text-gray-400">{parcel.ref_cadastrale} · {parcel.surface_ha?.toFixed(1)} ha</p>
                                 <p className="text-xs text-gray-400">HTB: {(parcel.dist_poste_htb_m/1000).toFixed(1)} km · LP: {parcel.dist_landing_point_km} km</p>
+                                {parcel.future_400kv_buffer && (
+                                  <p className="text-xs font-bold" style={{ color: '#ff0040' }}>
+                                    400kV Future: {parcel.future_400kv_buffer} (+{parcel.future_400kv_score_bonus}pts)
+                                  </p>
+                                )}
                                 <div className="mt-2 flex items-center gap-2">
                                   <span className="font-mono text-lg" style={{ color }}>
                                     {score.toFixed(0)}/100
@@ -1188,6 +1248,13 @@ export default function Dashboard() {
                         icon="■"
                         active={layers.dc_existants} 
                         onClick={() => toggleLayer('dc_existants')} 
+                      />
+                      <LayerToggle 
+                        label="400kV Future Fos→Jonq." 
+                        color="#ff0040" 
+                        icon="⚡"
+                        active={layers.rte_future_400kv} 
+                        onClick={() => toggleLayer('rte_future_400kv')} 
                       />
                     </div>
                   )}
@@ -1359,6 +1426,7 @@ export default function Dashboard() {
             <LayerToggle label="Landing Points" color="#00d4aa" icon="⚓" active={layers.landing_points} onClick={() => toggleLayer('landing_points')} />
             <LayerToggle label="Câbles sous-marins" color="#00d4aa" icon="〰" active={layers.submarine_cables} onClick={() => toggleLayer('submarine_cables')} />
             <LayerToggle label="DC existants" color="#8b5cf6" icon="■" active={layers.dc_existants} onClick={() => toggleLayer('dc_existants')} />
+            <LayerToggle label="400kV Future" color="#ff0040" icon="⚡" active={layers.rte_future_400kv} onClick={() => toggleLayer('rte_future_400kv')} />
           </div>
         </div>
       )}
@@ -1733,6 +1801,68 @@ function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
             </div>
           </div>
         </div>
+
+        {/* Future 400kV Line — Raccordement futur */}
+        {parcel.dist_future_400kv_m != null && (
+          <div className="panel p-3" data-testid="future-400kv-section">
+            <p className="text-xs font-mono uppercase mb-2" style={{ color: '#ff0040' }}>
+              Future ligne 400 kV Fos → Jonquières
+            </p>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between">
+                <span style={{ color: '#8f8f9d' }}>Distance à la ligne</span>
+                <span className="font-mono font-bold" style={{ 
+                  color: parcel.dist_future_400kv_m < 1000 ? '#ff4757' 
+                       : parcel.dist_future_400kv_m < 3000 ? '#ffa502' 
+                       : parcel.dist_future_400kv_m < 5000 ? '#ffd32a' 
+                       : '#8f8f9d' 
+                }}>
+                  {parcel.dist_future_400kv_m < 1000 
+                    ? `${parcel.dist_future_400kv_m} m` 
+                    : `${(parcel.dist_future_400kv_m / 1000).toFixed(1)} km`}
+                </span>
+              </div>
+              {parcel.future_400kv_buffer && (
+                <div className="flex justify-between">
+                  <span style={{ color: '#8f8f9d' }}>Zone</span>
+                  <span className={`badge ${
+                    parcel.future_400kv_buffer === '1km' ? 'badge-danger' :
+                    parcel.future_400kv_buffer === '3km' ? 'badge-warning' : 'badge-info'
+                  }`}>
+                    {parcel.future_400kv_buffer === '1km' ? 'Zone chaude (1 km)' :
+                     parcel.future_400kv_buffer === '3km' ? 'Zone stratégique (3 km)' :
+                     'Zone opportunité (5 km)'}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span style={{ color: '#8f8f9d' }}>Bonus scoring</span>
+                <span className="font-mono font-bold" style={{ color: '#00d4aa' }}>
+                  +{parcel.future_400kv_score_bonus || 0} pts
+                </span>
+              </div>
+              {parcel.future_grid_potential && (
+                <div className="flex justify-between mt-1 pt-1" style={{ borderTop: '1px solid #1f1f2e' }}>
+                  <span style={{ color: '#8f8f9d' }}>Potentiel réseau futur</span>
+                  <span className="font-mono font-bold" style={{ 
+                    color: parcel.future_grid_potential.future_grid_potential_score >= 60 ? '#00d4aa' 
+                         : parcel.future_grid_potential.future_grid_potential_score >= 40 ? '#ffa502' 
+                         : '#8f8f9d' 
+                  }}>
+                    {parcel.future_grid_potential.future_grid_potential_score}/100
+                  </span>
+                </div>
+              )}
+              {parcel.future_400kv_buffer && (
+                <p className="text-[10px] mt-2 px-2 py-1 rounded" style={{ 
+                  background: '#ff004015', color: '#ff4757', border: '1px solid #ff004030' 
+                }}>
+                  Potentiel raccordement futur élevé — Mise en service estimée ~2029
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Score breakdown */}
         <div className="panel p-3">

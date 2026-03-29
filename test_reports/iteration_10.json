@@ -1,0 +1,95 @@
+{
+  "summary": "RTE Future 400kV Line Feature Test (Iteration 10) - All 14 backend tests passed. Frontend fully functional with future line rendering, layer toggle, popup, and buffer zones.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "=== RTE FUTURE 400kV ENDPOINT (6/6) ===",
+    "GET /api/map/rte-future-400kv returns 200 OK",
+    "Response contains LineString with 13 coordinate points (Fos→Jonquières)",
+    "Response contains 3 buffer zones (1km, 3km, 5km) as Polygons",
+    "Buffer zone colors correct: red (#ff4757) 1km, orange (#ffa502) 3km, yellow (#ffd32a) 5km",
+    "Metadata includes: nom, tension_kv=400, mise_en_service_estimee=~2029, description",
+    "Scoring rules present: +30 <1km, +20 1-3km, +10 3-5km, 0 >5km",
+    "=== DC SEARCH WITH FUTURE 400kV (4/4) ===",
+    "POST /api/dc/search with region=PACA includes future_400kv data (distance_m, buffer_zone, score_bonus, future_grid_potential)",
+    "Score bonus values correct based on distance (<1km=30, <3km=20, <5km=10, >5km=0)",
+    "future_grid_potential has score (0-100) and category (excellent/tres_bon/bon/moyen/faible)",
+    "Sites near line have 'future_400kv_proximity' tag",
+    "=== BBOX PARCELS (1/1) ===",
+    "GET /api/france/parcelles/bbox includes dist_future_400kv_m, future_400kv_buffer, future_400kv_score_bonus, future_grid_potential",
+    "=== PDF EXPORT (2/2) ===",
+    "POST /api/export/pdf with future_400kv data returns valid PDF",
+    "POST /api/export/pdf/dc-site for PACA site returns valid PDF",
+    "=== SCORING INTEGRATION (1/1) ===",
+    "DC search score includes future_400kv_bonus field",
+    "=== FRONTEND DESKTOP ===",
+    "Dashboard loads with COCKPIT IMMO header",
+    "Map container (Leaflet) visible",
+    "Layer toggle '400kV Future Fos→Jonq.' visible in COUCHES panel",
+    "Future line renders as red dashed polyline (dasharray=12,6, stroke=#ff0040)",
+    "Buffer zones render with correct colors (yellow 5km, orange 3km, red 1km)",
+    "Clicking on line shows popup with: 'Future ligne RTE 400 kV Fos-sur-Mer → Jonquières', '400 kV · Mise en service : ~2029', project description",
+    "Layer can be toggled on/off (line hidden when toggled off)",
+    "=== FRONTEND MOBILE ===",
+    "Mobile dashboard loads correctly",
+    "Mobile layers button visible",
+    "Layer toggle '400kV Future' visible in mobile layers panel",
+    "=== PARCEL DETAIL SECTION ===",
+    "ParcelDetail component has data-testid='future-400kv-section'",
+    "Shows: Distance à la ligne, Zone (chaude/stratégique/opportunité), Bonus scoring, Potentiel réseau futur"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_rte_future_400kv.py",
+    "/app/test_reports/pytest/pytest_results_rte_future.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_rte_future_400kv.py"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14 tests passed)",
+    "frontend": "100% (all features working)"
+  },
+  "test_credentials": "Cookie: session_token=test_session_token_2026",
+  "seed_data_creation": "No seed data needed - uses rte_future_line.py for line coordinates and buffer generation",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "RTE Future 400kV line feature fully tested. Key endpoints: 1) GET /api/map/rte-future-400kv returns GeoJSON line + 3 buffer zones + metadata + scoring rules. 2) POST /api/dc/search includes future_400kv object with distance_m, buffer_zone, score_bonus, future_grid_potential. 3) GET /api/france/parcelles/bbox includes future_400kv fields. Frontend: Layer toggle '400kV Future Fos→Jonq.' in COUCHES panel, line renders as red dashed polyline, buffers render with correct colors, popup shows project info. ParcelDetail shows future 400kV section when parcel has dist_future_400kv_m. The line uses static approximate route (not live RTE data) - this is BY DESIGN.",
+  "feature_verification": {
+    "rte_future_400kv_endpoint": {
+      "url": "GET /api/map/rte-future-400kv",
+      "returns": "GeoJSON line (13 points) + 3 buffer polygons (1km/3km/5km) + metadata + scoring rules"
+    },
+    "dc_search_integration": {
+      "url": "POST /api/dc/search",
+      "future_400kv_fields": ["distance_m", "buffer_zone", "score_bonus", "future_grid_potential"]
+    },
+    "bbox_parcels_integration": {
+      "url": "GET /api/france/parcelles/bbox",
+      "future_400kv_fields": ["dist_future_400kv_m", "future_400kv_buffer", "future_400kv_score_bonus", "future_grid_potential"]
+    },
+    "scoring_rules": {
+      "<1km": "+30 pts",
+      "1-3km": "+20 pts",
+      "3-5km": "+10 pts",
+      ">5km": "0 pts"
+    },
+    "buffer_colors": {
+      "1km": "#ff4757 (red)",
+      "3km": "#ffa502 (orange)",
+      "5km": "#ffd32a (yellow)"
+    },
+    "frontend_layer_toggle": "400kV Future Fos→Jonq. in COUCHES panel (desktop) / 400kV Future (mobile)",
+    "line_style": "Red dashed polyline (dasharray=12,6, stroke=#ff0040)",
+    "popup_content": "Project name, 400kV, ~2029, description, source"
+  },
+  "mocked_api_note": "The future 400kV line uses a static approximate route from rte_future_line.py, not live RTE data. This is BY DESIGN because the exact route is not publicly available yet."
+}

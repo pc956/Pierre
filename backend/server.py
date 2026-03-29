@@ -34,6 +34,10 @@ from gpt_agent_config import get_openapi_schema, COCKPIT_IMMO_GPT_SYSTEM_PROMPT
 from chat_assistant import process_chat_message
 from dvf_data import get_dvf_for_commune, get_dvf_for_region
 from pdf_export import generate_parcel_pdf
+from rte_future_line import (
+    get_future_line_geojson, distance_to_future_line, get_buffer_zone,
+    score_future_400kv, compute_future_grid_potential
+)
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -627,6 +631,12 @@ async def get_map_electrical_assets(asset_type: Optional[str] = None):
     return {"electrical_assets": all_assets}
 
 
+@api_router.get("/map/rte-future-400kv")
+async def get_rte_future_line():
+    """Get the future RTE 400kV line Fos→Jonquières with buffer zones for map display"""
+    return get_future_line_geojson()
+
+
 @api_router.get("/s3renr/top-opportunities")
 async def get_s3renr_opportunities(min_mw: int = 30, limit: int = 20):
     """Get top S3REnR opportunities for DC siting, sorted by MW available"""
@@ -968,11 +978,21 @@ async def get_commune_parcelles(code_insee: str, section: Optional[str] = None, 
             parsed["plu_zone"] = "U"
             parsed["zone_saturation"] = "inconnu"
             
+            # Future 400kV line distance & scoring
+            dist_future_400kv = distance_to_future_line(plon, plat)
+            parsed["dist_future_400kv_m"] = round(dist_future_400kv)
+            parsed["future_400kv_buffer"] = get_buffer_zone(plon, plat)
+            parsed["future_400kv_score_bonus"] = score_future_400kv(plon, plat)
+            
             # Compute score
             try:
                 score_data = compute_full_score(parsed, project_type)
+                base_score = score_data.get("score_net", 0)
+                bonus_400kv = score_future_400kv(plon, plat)
                 parsed["score"] = {
-                    "score_net": score_data.get("score_net", 0),
+                    "score_net": min(100, base_score + bonus_400kv),
+                    "score_net_base": base_score,
+                    "future_400kv_bonus": bonus_400kv,
                     "verdict": score_data.get("verdict", "CONDITIONNEL"),
                     "power_mw_p50": score_data.get("power_mw_p50", 0),
                 }
@@ -1097,11 +1117,28 @@ async def get_bbox_parcelles(
             parsed["plu_libelong"] = plu_libelong
             parsed["zone_saturation"] = "inconnu"
             
+            # Future 400kV line distance & scoring
+            dist_future_400kv = distance_to_future_line(plon, plat)
+            parsed["dist_future_400kv_m"] = round(dist_future_400kv)
+            parsed["future_400kv_buffer"] = get_buffer_zone(plon, plat)
+            parsed["future_400kv_score_bonus"] = score_future_400kv(plon, plat)
+            fgp = compute_future_grid_potential(
+                plon, plat,
+                dist_poste_htb_m=min_dist_htb,
+            )
+            parsed["future_grid_potential"] = fgp
+            
             # Compute score
             try:
                 score_data = compute_full_score(parsed, project_type)
+                base_score = score_data.get("score_net", 0)
+                # Add future 400kV bonus to the score
+                bonus_400kv = score_future_400kv(plon, plat)
+                adjusted_score = min(100, base_score + bonus_400kv)
                 parsed["score"] = {
-                    "score_net": score_data.get("score_net", 0),
+                    "score_net": adjusted_score,
+                    "score_net_base": base_score,
+                    "future_400kv_bonus": bonus_400kv,
                     "verdict": score_data.get("verdict", "CONDITIONNEL"),
                     "power_mw_p50": score_data.get("power_mw_p50", 0),
                     "score_electricite": score_data.get("score_electricite", 0),

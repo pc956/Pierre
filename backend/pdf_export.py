@@ -268,6 +268,31 @@ def generate_parcel_pdf(parcel: dict, dvf_data: dict = None) -> bytes:
     if dvf_rows:
         elements.append(_make_data_table(dvf_rows))
     
+    # ── FUTURE LIGNE 400kV ──
+    future_400kv = parcel.get('future_400kv', {})
+    dist_future = parcel.get('dist_future_400kv_m')
+    future_buffer = parcel.get('future_400kv_buffer')
+    future_bonus = parcel.get('future_400kv_score_bonus', 0)
+    future_grid_p = parcel.get('future_grid_potential', {})
+    
+    if dist_future is not None or future_400kv:
+        elements.append(Paragraph('Future Ligne 400 kV (Fos → Jonquières)', styles['SectionTitle']))
+        f_rows = []
+        d = dist_future or future_400kv.get('distance_m', 0)
+        if d:
+            f_rows.append(['Distance à la ligne', f"{d:,.0f} m ({d/1000:.1f} km)"])
+        bz = future_buffer or future_400kv.get('buffer_zone')
+        if bz:
+            zone_label = {'1km': 'Zone chaude (1 km)', '3km': 'Zone stratégique (3 km)', '5km': 'Zone opportunité (5 km)'}.get(bz, bz)
+            f_rows.append(['Zone', zone_label])
+        bonus = future_bonus or future_400kv.get('score_bonus', 0)
+        f_rows.append(['Bonus scoring', f"+{bonus} pts"])
+        fgp = future_grid_p or future_400kv.get('future_grid_potential', {})
+        if fgp:
+            f_rows.append(['Potentiel réseau futur', f"{fgp.get('future_grid_potential_score', 0)}/100 ({fgp.get('future_grid_category', 'N/A')})"])
+        f_rows.append(['Mise en service estimée', '~2029 (projet RTE)'])
+        elements.append(_make_data_table(f_rows))
+    
     # ── COMMENTAIRE ──
     comment = parcel.get('comment', '')
     if comment:
