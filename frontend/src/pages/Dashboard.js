@@ -1303,21 +1303,17 @@ function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
             </div>
             <div className="flex justify-between items-center text-xs pt-2" style={{ borderTop: '1px solid #1f1f2e' }}>
               <span style={{ color: '#8f8f9d' }}>Réf. cadastrale</span>
-              {parcel.proprietaire_siren ? (
-                <button
-                  onClick={() => onShowSiren && onShowSiren(parcel)}
-                  className="font-mono flex items-center gap-1 hover:underline"
-                  style={{ color: '#3b82f6' }}
-                  data-testid="ref-cadastrale-btn"
-                >
-                  {parcel.ref_cadastrale || '-'}
-                  <ExternalLink size={10} />
-                </button>
-              ) : (
-                <span className="font-mono" style={{ color: '#e8e8ed' }}>
-                  {parcel.ref_cadastrale || '-'}
-                </span>
-              )}
+              <a
+                href={`https://www.google.com/maps/@${parcel.latitude},${parcel.longitude},17z/data=!3m1!1e1`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono flex items-center gap-1 hover:underline"
+                style={{ color: '#3b82f6' }}
+                data-testid="ref-cadastrale-btn"
+              >
+                {parcel.ref_cadastrale || '-'}
+                <ExternalLink size={10} />
+              </a>
             </div>
             {parcel.proprietaire_siren && (
               <div className="flex justify-between text-xs">
