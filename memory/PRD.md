@@ -7,7 +7,7 @@ Plateforme de prospection foncière pour data centers en France. Backend FastAPI
 - **Backend**: FastAPI + MongoDB
 - **Frontend**: React + TailwindCSS + React-Leaflet
 - **Auth**: Google OAuth via Emergent Auth
-- **LLM**: GPT-4.1-mini via Emergent LLM Key
+- **LLM**: GPT-4o-mini via Emergent LLM Key
 - **APIs externes**: IGN Carto (cadastre), GPU (urbanisme/PLU/prescriptions/infos)
 
 ## Fonctionnalités implémentées
@@ -27,6 +27,15 @@ Plateforme de prospection foncière pour data centers en France. Backend FastAPI
 - [x] Indicateur de confiance (haute/moyenne/basse)
 - [x] Composite : dynamique prioritaire → fallback statique
 
+### Phase 11 — Interface AI-First
+- [x] Suppression complète du tableau (ParcelsTable)
+- [x] Suppression des filtres manuels / barre de recherche
+- [x] Suppression de la navigation Carte/Tableau (activeView)
+- [x] Suppression de la navigation mobile bottom (Carte/Tableau/Stats)
+- [x] Ajout import Building2 manquant
+- [x] Implémentation loadParcelsAroundPoint (popups postes HTB / landing points)
+- [x] Interface 100% pilotée par l'Agent IA (chatbot)
+
 ## Endpoints API
 | Endpoint | Méthode | Description |
 |----------|---------|-------------|
@@ -37,6 +46,8 @@ Plateforme de prospection foncière pour data centers en France. Backend FastAPI
 | `/api/dc/search` | POST | Recherche DC |
 | `/api/map/rte-future-400kv` | GET | Future 400kV |
 | `/api/export/pdf/{id}` | GET | Export PDF |
+| `/api/france/parcelles/bbox` | GET | Parcelles par BBox viewport |
+| `/api/france/parcelles/commune/{code}` | GET | Parcelles par commune |
 
 ## Backlog
 - [ ] **P1**: Couches risques environnementaux (inondations, sismique)
