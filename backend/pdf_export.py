@@ -293,6 +293,23 @@ def generate_parcel_pdf(parcel: dict, dvf_data: dict = None) -> bytes:
         f_rows.append(['Mise en service estimée', '~2029 (projet RTE)'])
         elements.append(_make_data_table(f_rows))
     
+    # ── SCORING PLU DC ──
+    plu_sc = parcel.get('plu_scoring', {})
+    if plu_sc:
+        elements.append(Paragraph('Scoring PLU Data Center', styles['SectionTitle']))
+        plu_rows = [
+            ['Zone PLU', f"{plu_sc.get('plu_code', 'N/A')} — {plu_sc.get('plu_label', '')}"],
+            ['Score PLU', f"{plu_sc.get('plu_score', 0)}/100"],
+            ['Statut', plu_sc.get('plu_status', 'N/A')],
+            ['Risque urbanistique', plu_sc.get('urbanism_risk', 'N/A')],
+            ['Action recommandée', plu_sc.get('recommended_action', 'N/A')],
+        ]
+        if plu_sc.get('exclusion_reason'):
+            plu_rows.append(['Raison exclusion', plu_sc['exclusion_reason']])
+        if plu_sc.get('flags'):
+            plu_rows.append(['Flags', ', '.join(plu_sc['flags'])])
+        elements.append(_make_data_table(plu_rows))
+    
     # ── COMMENTAIRE ──
     comment = parcel.get('comment', '')
     if comment:

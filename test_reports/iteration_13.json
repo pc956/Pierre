@@ -1,0 +1,105 @@
+{
+  "summary": "Iteration 13 Testing Complete - PLU Scoring Module for DC Land Prospecting. All 20 backend tests passed. Frontend displays PLU scoring in chatbot parcel cards and parcel detail panel.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "=== PLU SCORING QUICK ENDPOINT (6/6) ===",
+    "GET /api/scoring/plu/UI returns score=90, status=FAVORABLE, action=prospect_now",
+    "GET /api/scoring/plu/N returns score=0, status=EXCLUDED, exclusion_reason not null",
+    "GET /api/scoring/plu/A returns score=0, status=EXCLUDED",
+    "GET /api/scoring/plu/AU returns score=72, status=WATCHLIST, action=check_regulation_and_mayor",
+    "GET /api/scoring/plu/UD returns score=15, status=UNFAVORABLE, action=reject",
+    "GET /api/scoring/plu/UX returns score=90, status=FAVORABLE",
+    "=== PLU SCORING WITH ADJUSTMENTS (5/5) ===",
+    "POST /api/scoring/plu with brownfield+ZAC on UI zone returns score=100 with brownfield_bonus flag",
+    "POST /api/scoring/plu with urbanisation_conditionnee+proximite_habitat on AU returns score=50 with flags",
+    "POST /api/scoring/plu with reglement_text containing positive keywords increases score (≥93)",
+    "POST /api/scoring/plu with contrainte_patrimoniale on residential zone returns UNFAVORABLE status",
+    "POST /api/scoring/plu with risque_reglementaire_majeur on UI returns score=70 (-20 penalty)",
+    "=== PLU SCORING IN CHATBOT (2/2) ===",
+    "POST /api/chat parcel search returns parcels with plu_scoring field containing plu_score, plu_status, recommended_action",
+    "Chatbot auto-excludes EXCLUDED parcels from results (zones N/A not returned)",
+    "=== PLU SCORING IN DC SEARCH (1/1) ===",
+    "POST /api/dc/search returns sites with urbanism.plu_scoring field",
+    "=== PDF EXPORT (1/1) ===",
+    "POST /api/export/pdf with plu_scoring data returns valid PDF",
+    "=== STATUS RANGES (5/5) ===",
+    "FAVORABLE range: score 85-100 (UI zone = 90)",
+    "WATCHLIST range: score 65-84 (AU zone = 72)",
+    "CONDITIONAL range: score 45-64 (UM zone = 55)",
+    "UNFAVORABLE range: score 1-44 (UD zone = 15)",
+    "EXCLUDED range: score 0 (N zone = 0)",
+    "=== FRONTEND VERIFICATION ===",
+    "Dashboard loads with COCKPIT IMMO header and map",
+    "Chatbot opens with 'Assistant Cockpit Immo' panel",
+    "Chat parcel search returns parcel_results with PLU badges (PLU 72, PLU 55, etc.)",
+    "Parcel cards in chatbot show PLU score badge with color coding",
+    "Clicking parcel card opens ParcelDetail panel",
+    "ParcelDetail panel has 'Urbanisme — Scoring PLU' section with data-testid='plu-scoring-section'",
+    "PLU Scoring section displays: score bar, status badge, risk level, recommended action, flags"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_plu_scoring_iteration13.py",
+    "/app/test_reports/pytest/pytest_results_plu_iteration13.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_plu_scoring_iteration13.py"
+  ],
+  "success_rate": {
+    "backend": "100% (20/20 tests passed)",
+    "frontend": "100% (all PLU scoring features working)"
+  },
+  "test_credentials": "Cookie: session_token=test_session_token_2026",
+  "seed_data_creation": "No seed data needed - uses real IGN Carto API for cadastral parcels",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 13 tested the NEW PLU Scoring module for DC land prospecting. Key findings: 1) All PLU scoring endpoints work correctly with proper score ranges and status assignments. 2) Hard exclusions work for N/A zones (score=0, status=EXCLUDED). 3) Adjustments work correctly: brownfield (+10), ZAC (+8), equipment (+7), urbanisation_conditionnee (-12), proximite_habitat (-10), contrainte_patrimoniale (-18), risque_majeur (-20). 4) Keyword parsing from reglement_text adds +3 to +5 for positive keywords. 5) Chatbot auto-excludes EXCLUDED parcels from results. 6) Frontend displays PLU scoring in chatbot parcel cards and ParcelDetail panel with score bar, status badge, risk level, recommended action, and flags.",
+  "feature_verification": {
+    "plu_scoring_module": {
+      "base_scores": {
+        "industrial_zones": "UI/UX/UY/UZ = 90 (FAVORABLE)",
+        "au_zones": "AU/1AU/AUX = 72 (WATCHLIST)",
+        "mixed_zones": "UM/UT = 55 (CONDITIONAL)",
+        "residential_zones": "UD/UH = 15 (UNFAVORABLE)",
+        "excluded_zones": "N/A = 0 (EXCLUDED)"
+      },
+      "adjustments": {
+        "brownfield": "+10 pts",
+        "zac_zip_port": "+8 pts",
+        "reglement_allows_equipment": "+7 pts",
+        "positive_keywords": "+3 to +5 pts",
+        "urbanisation_conditionnee": "-12 pts",
+        "proximite_habitat": "-10 pts",
+        "contrainte_patrimoniale": "-18 pts",
+        "risque_reglementaire_majeur": "-20 pts"
+      },
+      "status_ranges": {
+        "FAVORABLE": "85-100",
+        "WATCHLIST": "65-84",
+        "CONDITIONAL": "45-64",
+        "UNFAVORABLE": "1-44",
+        "EXCLUDED": "0"
+      }
+    },
+    "integrations": {
+      "chatbot": "plu_scoring field in parcel results, auto-excludes EXCLUDED parcels",
+      "dc_search": "urbanism.plu_scoring field in site results",
+      "pdf_export": "PLU Scoring section in PDF fiche",
+      "bbox_parcels": "plu_scoring computed for each parcel"
+    },
+    "frontend_display": {
+      "chatbot_parcel_cards": "PLU score badge with color coding",
+      "parcel_detail_panel": "Full PLU Scoring section with score bar, status, risk, action, flags"
+    }
+  },
+  "mocked_api_note": "No mocked APIs - uses real IGN Carto API for cadastral parcels and Emergent LLM key for NLP parsing"
+}

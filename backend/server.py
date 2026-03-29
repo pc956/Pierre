@@ -38,6 +38,7 @@ from rte_future_line import (
     get_future_line_geojson, distance_to_future_line, get_buffer_zone,
     score_future_400kv, compute_future_grid_potential
 )
+from plu_scoring import score_plu, parse_reglement_keywords
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -639,6 +640,42 @@ async def get_rte_future_line():
     return get_future_line_geojson()
 
 
+class PLUScoringRequest(BaseModel):
+    zone_code: str
+    zone_label: str = ""
+    is_brownfield: bool = False
+    is_zac_zip_port: bool = False
+    reglement_allows_equipment: bool = False
+    urbanisation_conditionnee: bool = False
+    proximite_habitat: bool = False
+    contrainte_patrimoniale: bool = False
+    risque_reglementaire_majeur: bool = False
+    reglement_text: Optional[str] = None
+
+
+@api_router.post("/scoring/plu")
+async def score_plu_endpoint(req: PLUScoringRequest):
+    """Score PLU compatibility for a data center project"""
+    return score_plu(
+        zone_code=req.zone_code,
+        zone_label=req.zone_label,
+        is_brownfield=req.is_brownfield,
+        is_zac_zip_port=req.is_zac_zip_port,
+        reglement_allows_equipment=req.reglement_allows_equipment,
+        urbanisation_conditionnee=req.urbanisation_conditionnee,
+        proximite_habitat=req.proximite_habitat,
+        contrainte_patrimoniale=req.contrainte_patrimoniale,
+        risque_reglementaire_majeur=req.risque_reglementaire_majeur,
+        reglement_text=req.reglement_text,
+    )
+
+
+@api_router.get("/scoring/plu/{zone_code}")
+async def score_plu_quick(zone_code: str):
+    """Quick PLU scoring by zone code only"""
+    return score_plu(zone_code=zone_code)
+
+
 @api_router.get("/s3renr/top-opportunities")
 async def get_s3renr_opportunities(min_mw: int = 30, limit: int = 20):
     """Get top S3REnR opportunities for DC siting, sorted by MW available"""
@@ -1118,6 +1155,14 @@ async def get_bbox_parcelles(
             parsed["plu_libelle"] = plu_libelle
             parsed["plu_libelong"] = plu_libelong
             parsed["zone_saturation"] = "inconnu"
+            
+            # PLU Scoring for DC compatibility
+            plu_scoring_result = score_plu(
+                zone_code=plu_zone,
+                zone_label=plu_libelle,
+                reglement_text=plu_libelong if plu_libelong else None,
+            )
+            parsed["plu_scoring"] = plu_scoring_result
             
             # Future 400kV line distance & scoring
             dist_future_400kv = distance_to_future_line(plon, plat)

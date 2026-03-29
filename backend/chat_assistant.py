@@ -18,6 +18,7 @@ from france_infra_data import get_all_france_infra
 from rte_future_line import distance_to_future_line, get_buffer_zone, score_future_400kv
 from scoring import compute_full_score
 from dvf_data import get_dvf_for_commune
+from plu_scoring import score_plu
 
 load_dotenv()
 logger = logging.getLogger("chat_assistant")
@@ -255,6 +256,17 @@ async def _find_real_parcels(params: dict) -> dict:
             if plu_zones and parsed["plu_zone"] not in plu_zones and parsed["plu_zone"] != "inconnu":
                 continue
             
+            # PLU Scoring for DC compatibility
+            plu_scoring_result = score_plu(
+                zone_code=parsed["plu_zone"],
+                zone_label=parsed.get("plu_libelle", ""),
+            )
+            parsed["plu_scoring"] = plu_scoring_result
+            
+            # Auto-exclude parcels with EXCLUDED PLU status
+            if plu_scoring_result["plu_status"] == "EXCLUDED":
+                continue
+            
             # Future 400kV
             dist_future = distance_to_future_line(plon, plat)
             parsed["dist_future_400kv_m"] = round(dist_future)
@@ -317,6 +329,7 @@ async def _find_real_parcels(params: dict) -> dict:
             "landing_point_nom": p.get("landing_point_nom", ""),
             "plu_zone": p.get("plu_zone", "inconnu"),
             "plu_libelle": p.get("plu_libelle", ""),
+            "plu_scoring": p.get("plu_scoring"),
             "dvf_prix_median_m2": p.get("dvf_prix_median_m2", 0),
             "dist_future_400kv_m": p.get("dist_future_400kv_m", 0),
             "future_400kv_buffer": p.get("future_400kv_buffer"),

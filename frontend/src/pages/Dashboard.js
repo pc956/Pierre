@@ -1891,9 +1891,9 @@ function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
           )}
         </div>
 
-        {/* Urbanisme */}
-        <div className="panel p-3">
-          <p className="text-xs font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>Urbanisme</p>
+        {/* Urbanisme — PLU Scoring DC */}
+        <div className="panel p-3" data-testid="plu-scoring-section">
+          <p className="text-xs font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>Urbanisme — Scoring PLU</p>
           <div className="flex items-center gap-2 mb-2">
             <span className="text-sm font-bold font-mono px-2 py-0.5 rounded" style={{ 
               color: parcel.plu_zone === 'U' ? '#2ed573' 
@@ -1910,22 +1910,109 @@ function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
               PLU: {parcel.plu_zone || 'inconnu'}
               {parcel.plu_libelle ? ` (${parcel.plu_libelle})` : ''}
             </span>
-            <span className={`badge ${
-              score.urba_compatibilite === 'compatible' ? 'badge-success' :
-              score.urba_compatibilite === 'compatible_sous_conditions' ? 'badge-warning' : 'badge-danger'
-            }`}>
-              {score.urba_compatibilite?.replace(/_/g, ' ')}
-            </span>
           </div>
           {parcel.plu_libelong && (
             <p className="text-xs mb-2" style={{ color: '#8f8f9d' }}>{parcel.plu_libelong}</p>
           )}
-          <div className="flex items-center justify-between text-xs">
-            <span style={{ color: '#8f8f9d' }}>Deal Friction Index</span>
-            <span className="font-mono" style={{ color: score.urba_deal_friction_index < 30 ? '#00d4aa' : '#ffa502' }}>
-              {score.urba_deal_friction_index || 0}/100
-            </span>
-          </div>
+          
+          {/* PLU Score bar */}
+          {parcel.plu_scoring && (
+            <div className="space-y-2 mt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: '#8f8f9d' }}>Score PLU DC</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-sm" style={{ 
+                    color: parcel.plu_scoring.plu_score >= 85 ? '#2ed573' 
+                         : parcel.plu_scoring.plu_score >= 65 ? '#ffa502' 
+                         : parcel.plu_scoring.plu_score >= 45 ? '#f0932b' 
+                         : '#ff4757' 
+                  }}>
+                    {parcel.plu_scoring.plu_score}/100
+                  </span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                    parcel.plu_scoring.plu_status === 'FAVORABLE' ? 'text-green-400 bg-green-400/10' :
+                    parcel.plu_scoring.plu_status === 'WATCHLIST' ? 'text-yellow-400 bg-yellow-400/10' :
+                    parcel.plu_scoring.plu_status === 'CONDITIONAL' ? 'text-orange-400 bg-orange-400/10' :
+                    parcel.plu_scoring.plu_status === 'EXCLUDED' ? 'text-red-500 bg-red-500/10' :
+                    'text-red-400 bg-red-400/10'
+                  }`} data-testid="plu-status-badge">
+                    {parcel.plu_scoring.plu_status}
+                  </span>
+                </div>
+              </div>
+              {/* Score bar */}
+              <div className="w-full h-1.5 rounded-full" style={{ background: '#1f1f2e' }}>
+                <div className="h-full rounded-full transition-all" style={{ 
+                  width: `${parcel.plu_scoring.plu_score}%`,
+                  background: parcel.plu_scoring.plu_score >= 85 ? '#2ed573' 
+                            : parcel.plu_scoring.plu_score >= 65 ? '#ffa502' 
+                            : parcel.plu_scoring.plu_score >= 45 ? '#f0932b' 
+                            : '#ff4757',
+                }} />
+              </div>
+              
+              {/* Risk level */}
+              <div className="flex items-center justify-between text-xs">
+                <span style={{ color: '#8f8f9d' }}>Risque urbanistique</span>
+                <span className="font-mono" style={{ 
+                  color: parcel.plu_scoring.urbanism_risk === 'faible' ? '#2ed573'
+                       : parcel.plu_scoring.urbanism_risk === 'modere' ? '#ffa502'
+                       : '#ff4757' 
+                }}>
+                  {parcel.plu_scoring.urbanism_risk}
+                </span>
+              </div>
+              
+              {/* Recommended action */}
+              <div className="flex items-center justify-between text-xs">
+                <span style={{ color: '#8f8f9d' }}>Action recommandée</span>
+                <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+                  parcel.plu_scoring.recommended_action === 'prospect_now' ? 'text-green-400 bg-green-400/10' :
+                  parcel.plu_scoring.recommended_action === 'check_regulation_and_mayor' ? 'text-yellow-400 bg-yellow-400/10' :
+                  parcel.plu_scoring.recommended_action === 'manual_review' ? 'text-orange-400 bg-orange-400/10' :
+                  'text-red-400 bg-red-400/10'
+                }`}>
+                  {parcel.plu_scoring.recommended_action === 'prospect_now' ? 'Prospecter maintenant' :
+                   parcel.plu_scoring.recommended_action === 'check_regulation_and_mayor' ? 'Vérifier réglementation' :
+                   parcel.plu_scoring.recommended_action === 'manual_review' ? 'Revue manuelle' :
+                   'Rejeter'}
+                </span>
+              </div>
+              
+              {/* Flags */}
+              {parcel.plu_scoring.flags && parcel.plu_scoring.flags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {parcel.plu_scoring.flags.map((flag, idx) => (
+                    <span key={idx} className="text-[9px] px-1 py-0.5 rounded" style={{ 
+                      background: flag.includes('bonus') || flag.includes('favorable') ? '#2ed57315' : '#ff475715',
+                      color: flag.includes('bonus') || flag.includes('favorable') ? '#2ed573' : '#ff4757',
+                    }}>
+                      {flag.replace(/_/g, ' ')}
+                    </span>
+                  ))}
+                </div>
+              )}
+              
+              {/* Exclusion reason */}
+              {parcel.plu_scoring.exclusion_reason && (
+                <p className="text-[10px] px-2 py-1 rounded mt-1" style={{ 
+                  background: '#ff475715', color: '#ff4757', border: '1px solid #ff475730' 
+                }}>
+                  {parcel.plu_scoring.exclusion_reason}
+                </p>
+              )}
+            </div>
+          )}
+          
+          {/* Legacy scoring compatibility display */}
+          {!parcel.plu_scoring && (
+            <div className="flex items-center justify-between text-xs mt-1">
+              <span style={{ color: '#8f8f9d' }}>Deal Friction Index</span>
+              <span className="font-mono" style={{ color: score.urba_deal_friction_index < 30 ? '#00d4aa' : '#ffa502' }}>
+                {score.urba_deal_friction_index || 0}/100
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Raccordement */}

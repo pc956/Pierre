@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from france_infra_data import get_all_france_infra
 from s3renr_data import S3RENR_DATA
 from rte_future_line import distance_to_future_line, get_buffer_zone, score_future_400kv, compute_future_grid_potential
+from plu_scoring import score_plu
 
 logger = logging.getLogger("dc_search")
 
@@ -253,6 +254,7 @@ def _build_all_sites() -> List[Dict[str, Any]]:
             "urbanism": {
                 "plu_zone": plu_zone,
                 "data_center_compatible": plu_compatible,
+                "plu_scoring": score_plu(zone_code=plu_zone),
             },
             "connectivity": {
                 "nearest_landing_point_km": round(min_dist_lp, 1),

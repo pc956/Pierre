@@ -423,6 +423,20 @@ function ChatMessage({ msg, onSiteClick, onParcelClick }) {
                         400kV {p.future_400kv_buffer}
                       </span>
                     )}
+                    {p.plu_scoring && (
+                      <span className="px-1 rounded" style={{ 
+                        background: p.plu_scoring.plu_status === 'FAVORABLE' ? '#2ed57322' 
+                                  : p.plu_scoring.plu_status === 'WATCHLIST' ? '#ffa50222' 
+                                  : p.plu_scoring.plu_status === 'CONDITIONAL' ? '#f0932b22' 
+                                  : '#ff475722',
+                        color: p.plu_scoring.plu_status === 'FAVORABLE' ? '#2ed573' 
+                             : p.plu_scoring.plu_status === 'WATCHLIST' ? '#ffa502' 
+                             : p.plu_scoring.plu_status === 'CONDITIONAL' ? '#f0932b' 
+                             : '#ff4757',
+                      }}>
+                        PLU {p.plu_scoring.plu_score}
+                      </span>
+                    )}
                   </div>
                   <div className="mt-1 text-[9px]" style={{ color: '#00d4aa88' }}>
                     {p.score?.verdict} · {p.site_origin}
