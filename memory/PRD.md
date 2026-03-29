@@ -13,49 +13,42 @@ Plateforme complète de prospection foncière pour data centers en France ("Cock
 
 ## Fonctionnalités implémentées
 
-### Phase 1 — Infrastructure de base
-- [x] Carte Leaflet avec fond sombre
-- [x] Postes HTB (400kV, 225kV, 63kV) sur toute la France
-- [x] Lignes HTB, Landing points, câbles sous-marins, DC existants
-- [x] Système de scoring multi-critères
-
-### Phase 2 — S3REnR + Mobile + PLU
-- [x] Capacités et saturation S3REnR par région
-- [x] Mobile responsive (carte plein écran, bottom sheets)
+### Phase 1-4 — MVP complet
+- [x] Carte Leaflet (fond sombre) avec postes HTB, lignes, landing points, DC existants
+- [x] S3REnR capacités/saturation par région
+- [x] Mobile responsive (bottom sheets)
 - [x] PLU réel via API GPU
-
-### Phase 3 — API Search + GPT Agent + Chatbot
-- [x] `POST /api/dc/search` — recherche multi-critères pour agents IA
-- [x] Page configuration GPT Agent
-- [x] Chatbot IA intégré (Emergent LLM Key)
-
-### Phase 4 — DVF + PDF Export
-- [x] Données DVF par département
-- [x] Export PDF fiche parcelle/site
+- [x] API DC Search + GPT Agent + Chatbot IA
+- [x] DVF + Export PDF
 
 ### Phase 5 — Future ligne 400kV Fos → Jonquières (29/03/2026)
-- [x] Tracé approximatif + buffers 1km/3km/5km
-- [x] Scoring : +30pts (<1km), +20pts (<3km), +10pts (<5km)
-- [x] Indicateur composite `future_grid_potential_score`
-- [x] Couche toggleable + popup + fiche parcelle + export PDF
+- [x] Tracé approximatif + buffers 1km/3km/5km + scoring + couche toggleable
 
 ### Phase 6 — Chatbot proposant des parcelles exactes (29/03/2026)
 - [x] Action `find_parcels` : recherche de parcelles cadastrales réelles via IGN API
-- [x] Critères : région, MW cible, surface min, distance HTB max, zones PLU, stratégie
 - [x] Parcelles enrichies : ref cadastrale, surface, distance HTB, PLU, DVF, score, 400kV
 - [x] UI : cartes de parcelles cliquables → navigation carte + sélection
-- [x] Quick actions mises à jour ("Trouve des parcelles 30MW PACA", etc.)
-- [x] Actions macro (search/summary/site_detail) toujours fonctionnelles
+
+### Phase 7 — Filtres avancés IA + Optimisations DB (29/03/2026)
+- [x] Filtre PLU zone (U, AU, UI, AUx, etc.)
+- [x] Filtre surface min/max en hectares
+- [x] Filtre distance max au poste HTB (km)
+- [x] Filtre tension HTB minimum (225kV, 400kV)
+- [x] Filtre distance max à la future ligne 400kV (km)
+- [x] Badges de filtres actifs dans l'UI chatbot
+- [x] Optimisation N+1 : parcels batch $in query pour scores
+- [x] Optimisation N+1 : shortlists aggregation pipeline pour item counts
+- [x] Optimisation N+1 : shortlist detail batch fetch parcels + scores
 
 ## Endpoints API clés
 | Endpoint | Méthode | Description |
 |----------|---------|-------------|
-| `/api/chat` | POST | Chatbot IA (parcelles, sites, résumé) |
+| `/api/chat` | POST | Chatbot IA (parcelles exactes avec filtres avancés) |
 | `/api/map/rte-future-400kv` | GET | Future ligne 400kV + buffers |
 | `/api/dc/search` | POST | Recherche sites DC multi-critères |
 | `/api/export/pdf/{id}` | GET | Export fiche PDF |
 | `/api/france/parcelles/bbox` | GET | Parcelles par bbox |
-| `/api/map/electrical-assets` | GET | Actifs électriques |
+| `/api/shortlists` | GET | Shortlists (optimisé) |
 
 ## Backlog
 - [ ] **P1**: Couches risques environnementaux (inondations, sismique)
@@ -64,11 +57,9 @@ Plateforme complète de prospection foncière pour data centers en France ("Cock
 - [ ] **P2**: Alertes automatiques
 
 ## Fichiers de référence
-- `/app/backend/chat_assistant.py` — Chatbot LLM + find_parcels
+- `/app/backend/chat_assistant.py` — Chatbot LLM + find_parcels + filtres avancés
 - `/app/backend/rte_future_line.py` — Future ligne 400kV
-- `/app/backend/server.py` — Routes API principales
+- `/app/backend/server.py` — Routes API (optimisées N+1)
 - `/app/backend/dc_search_api.py` — Moteur de recherche DC
-- `/app/backend/pdf_export.py` — Génération PDF
-- `/app/backend/scoring.py` — Moteur de scoring
-- `/app/frontend/src/components/ChatBot.js` — UI chatbot + parcelles
-- `/app/frontend/src/pages/Dashboard.js` — Composant principal carte + sidebar
+- `/app/frontend/src/components/ChatBot.js` — UI chatbot + parcelles + badges filtres
+- `/app/frontend/src/pages/Dashboard.js` — Carte + sidebar
