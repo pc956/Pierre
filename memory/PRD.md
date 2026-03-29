@@ -1,7 +1,7 @@
 # Cockpit Immo - PRD (Product Requirements Document)
 
 ## Énoncé du problème
-Plateforme complète de prospection foncière pour data centers en France ("Cockpit Immo"). Backend FastAPI/MongoDB + Frontend React avec carte Leaflet thème sombre. Intégration réseau S3REnR, scoring multi-critères, données PLU réelles, API de recherche pour agents IA, chatbot LLM intégré, prix DVF, exports PDF.
+Plateforme complète de prospection foncière pour data centers en France ("Cockpit Immo"). Backend FastAPI/MongoDB + Frontend React avec carte Leaflet thème sombre.
 
 ## Architecture technique
 - **Backend**: FastAPI + MongoDB (`/app/backend/`)
@@ -14,41 +14,40 @@ Plateforme complète de prospection foncière pour data centers en France ("Cock
 ## Fonctionnalités implémentées
 
 ### Phase 1-4 — MVP complet
-- [x] Carte Leaflet (fond sombre) avec postes HTB, lignes, landing points, DC existants
-- [x] S3REnR capacités/saturation par région
-- [x] Mobile responsive (bottom sheets)
-- [x] PLU réel via API GPU
-- [x] API DC Search + GPT Agent + Chatbot IA
-- [x] DVF + Export PDF
+- [x] Carte Leaflet avec postes HTB, lignes, landing points, DC existants
+- [x] S3REnR capacités/saturation, Mobile responsive, PLU réel via API GPU
+- [x] API DC Search + GPT Agent + Chatbot IA, DVF + Export PDF
 
-### Phase 5 — Future ligne 400kV Fos → Jonquières (29/03/2026)
-- [x] Tracé approximatif + buffers 1km/3km/5km + scoring + couche toggleable
+### Phase 5 — Future ligne 400kV Fos → Jonquières
+- [x] Tracé + buffers 1km/3km/5km + scoring + couche toggleable
 
-### Phase 6 — Chatbot proposant des parcelles exactes (29/03/2026)
-- [x] Action `find_parcels` : recherche de parcelles cadastrales réelles via IGN API
-- [x] Parcelles enrichies : ref cadastrale, surface, distance HTB, PLU, DVF, score, 400kV
-- [x] UI : cartes de parcelles cliquables → navigation carte + sélection
+### Phase 6-7 — Chatbot parcelles exactes + Filtres avancés
+- [x] Recherche parcelles cadastrales réelles via IGN API
+- [x] Filtres : PLU zone, surface min/max, distance HTB, tension kV, distance future 400kV
+- [x] Optimisations N+1 (batch queries)
 
-### Phase 7 — Filtres avancés IA + Optimisations DB (29/03/2026)
-- [x] Filtre PLU zone (U, AU, UI, AUx, etc.)
-- [x] Filtre surface min/max en hectares
-- [x] Filtre distance max au poste HTB (km)
-- [x] Filtre tension HTB minimum (225kV, 400kV)
-- [x] Filtre distance max à la future ligne 400kV (km)
-- [x] Badges de filtres actifs dans l'UI chatbot
-- [x] Optimisation N+1 : parcels batch $in query pour scores
-- [x] Optimisation N+1 : shortlists aggregation pipeline pour item counts
-- [x] Optimisation N+1 : shortlist detail batch fetch parcels + scores
+### Phase 8 — Scoring PLU automatique DC (29/03/2026)
+- [x] Module `plu_scoring.py` : scoring 0-100 par zone PLU
+- [x] Hard exclusions : N, NL, Nh, Nl, A, Ap, A0 → score=0 EXCLUDED
+- [x] Scores de base : UI/UX/UY/UZ=90, AU/1AU/AUX=72, mixte=55, résidentiel=15
+- [x] Ajustements : +10 brownfield, +8 ZAC, +7 équipement, -12 urba conditionnée, -10 habitat, -18 patrimoine, -20 risque majeur
+- [x] Parser mots-clés règlement PLU (positifs/négatifs)
+- [x] Statuts : FAVORABLE (85-100), WATCHLIST (65-84), CONDITIONAL (45-64), UNFAVORABLE (1-44), EXCLUDED (0)
+- [x] Actions recommandées : prospect_now / check_regulation_and_mayor / manual_review / reject
+- [x] Endpoints API : `GET /api/scoring/plu/{zone}`, `POST /api/scoring/plu`
+- [x] Intégré dans : parcelles bbox, chatbot, DC search, export PDF
+- [x] Frontend : barre de score, badge statut, risque, action, flags dans ParcelDetail
+- [x] Chatbot : auto-exclusion des zones incompatibles + badge PLU score
 
-## Endpoints API clés
+## Endpoints API
 | Endpoint | Méthode | Description |
 |----------|---------|-------------|
-| `/api/chat` | POST | Chatbot IA (parcelles exactes avec filtres avancés) |
-| `/api/map/rte-future-400kv` | GET | Future ligne 400kV + buffers |
-| `/api/dc/search` | POST | Recherche sites DC multi-critères |
-| `/api/export/pdf/{id}` | GET | Export fiche PDF |
-| `/api/france/parcelles/bbox` | GET | Parcelles par bbox |
-| `/api/shortlists` | GET | Shortlists (optimisé) |
+| `/api/scoring/plu/{zone}` | GET | Score PLU rapide par code zone |
+| `/api/scoring/plu` | POST | Score PLU complet avec ajustements |
+| `/api/chat` | POST | Chatbot IA (parcelles avec scoring PLU) |
+| `/api/map/rte-future-400kv` | GET | Future ligne 400kV |
+| `/api/dc/search` | POST | Recherche sites DC |
+| `/api/export/pdf/{id}` | GET | Export PDF |
 
 ## Backlog
 - [ ] **P1**: Couches risques environnementaux (inondations, sismique)
@@ -57,9 +56,11 @@ Plateforme complète de prospection foncière pour data centers en France ("Cock
 - [ ] **P2**: Alertes automatiques
 
 ## Fichiers de référence
-- `/app/backend/chat_assistant.py` — Chatbot LLM + find_parcels + filtres avancés
+- `/app/backend/plu_scoring.py` — Scoring PLU automatique DC
+- `/app/backend/chat_assistant.py` — Chatbot IA + find_parcels
 - `/app/backend/rte_future_line.py` — Future ligne 400kV
-- `/app/backend/server.py` — Routes API (optimisées N+1)
+- `/app/backend/server.py` — Routes API principales
 - `/app/backend/dc_search_api.py` — Moteur de recherche DC
-- `/app/frontend/src/components/ChatBot.js` — UI chatbot + parcelles + badges filtres
-- `/app/frontend/src/pages/Dashboard.js` — Carte + sidebar
+- `/app/backend/pdf_export.py` — Génération PDF
+- `/app/frontend/src/pages/Dashboard.js` — Carte + sidebar + PLU scoring
+- `/app/frontend/src/components/ChatBot.js` — UI chatbot + parcelles
