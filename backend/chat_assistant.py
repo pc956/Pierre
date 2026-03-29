@@ -96,7 +96,7 @@ Si aucune parcelle n'a un score > 60, dis-le clairement et suggère d'élargir l
 ACTIONS POSSIBLES:
 
 1. action: "find_parcels" — TROUVER DES PARCELLES (action PRIORITAIRE)
-Utilise dès que l'utilisateur cherche des terrains, parcelles, ou sites pour un data center.
+Utilise cette action dès que l'utilisateur cherche des terrains, parcelles, sites, ou pose une question sur un lieu spécifique pour un data center.
 Paramètres:
 - mw_target: puissance cible en MW (défaut: 20)
 - region: code région "IDF"|"PACA"|"HdF"|"AuRA"|"BRE"|"GES"|"NOR"|"NAQ"|"OCC"|"PDL" (null si pas spécifié)
@@ -104,20 +104,16 @@ Paramètres:
 - min_surface_ha: surface minimum en hectares (défaut: 1.0)
 - max_surface_ha: surface maximum en hectares (null = pas de max)
 - max_dist_htb_km: distance max au poste HTB en km (défaut: 5)
-- plu_zones: liste de zones PLU acceptées (null = toutes). Valeurs: "U", "AU", "AUx", "Ux", "UI", "N", "A"
-- nb_parcels: nombre max de parcelles à retourner (défaut: 10, max: 20)
-- search_radius_m: rayon de recherche autour des postes HTB en mètres (défaut: 2000, max: 5000)
+- plu_zones: liste de zones PLU acceptées (null = toutes)
+- nb_parcels: nombre max de résultats (défaut: 10, max: 20)
+- search_radius_m: rayon de recherche en mètres (défaut: 2000, max: 5000)
 
-2. action: "search" — Recherche de SITES DC (vue macro)
-Paramètres: mw_target, mw_min, max_delay_months, region, strategy, grid_priority, brownfield_only, per_page
+2. action: "summary" — Résumé des capacités S3REnR par région
+Utilise quand l'utilisateur demande une vue d'ensemble nationale ou un résumé des capacités réseau.
 
-3. action: "site_detail" — Détail d'un site
-- site_id: identifiant du site
-
-4. action: "summary" — Résumé S3REnR régional
-
-5. action: "chat" — Question générale
-- response: ta réponse en texte
+3. action: "chat" — Question générale ou conversation
+- response: ta réponse en texte libre
+Utilise pour les questions qui ne nécessitent pas de recherche de parcelles.
 
 MAPPING LINGUISTIQUE:
 - "Paris", "Île-de-France", "IDF" → region: "IDF"
@@ -245,6 +241,18 @@ async def _enrich_parcel(parsed: dict, infra: dict, params: dict) -> dict:
 
     # ── Fibre réelle (Étape 2B) ──
     code_commune = parsed.get("code_commune", "")
+    # BUG 5 FIX — Reconstruire code_commune si vide
+    if not code_commune:
+        code_dep = parsed.get("departement", "")
+        commune_name = parsed.get("commune", "")
+        if code_dep and commune_name:
+            try:
+                communes = await api_search_communes(commune_name, limit=1)
+                if communes:
+                    code_commune = communes[0].get("code", "")
+                    parsed["code_commune"] = code_commune
+            except Exception:
+                pass
     plu_zone_raw = parsed.get("plu_zone", "")
     if code_commune:
         fibre = await estimate_fibre(code_commune, plu_zone_raw)
@@ -310,13 +318,33 @@ async def _enrich_parcel(parsed: dict, infra: dict, params: dict) -> dict:
     # ── SCORE UNIVERSEL /100 (Étape 1) ──
     score_data = compute_score_simple(parsed)
     bonus_400kv = score_future_400kv(plon, plat)
-    score_data["score"] = min(100, score_data["score"] + bonus_400kv)
-    # Recalculate resume with adjusted score
     if bonus_400kv > 0:
+        # BUG 3 FIX — Recalculer verdict + resume après bonus
+        old_score = score_data["score"]
+        score_data["score"] = min(100, old_score + bonus_400kv)
+        new_score = score_data["score"]
+        # Recalculer le verdict
+        if new_score >= 70:
+            score_data["verdict"] = "GO"
+        elif new_score >= 40:
+            score_data["verdict"] = "A_ETUDIER"
+        else:
+            score_data["verdict"] = "DEFAVORABLE"
+        # Reconstruire le resume
         score_data["resume"] = score_data["resume"].replace(
-            f"Score {score_data['score'] - bonus_400kv}/100",
-            f"Score {score_data['score']}/100"
+            f"Score {old_score}/100",
+            f"Score {new_score}/100"
         )
+        # Corriger le verdict dans le resume
+        for old_v in ["A_ETUDIER", "DEFAVORABLE", "GO"]:
+            if old_v in score_data["resume"] and old_v != score_data["verdict"]:
+                score_data["resume"] = score_data["resume"].replace(
+                    f"— {old_v}.", f"— {score_data['verdict']}."
+                )
+                break
+        # Ajouter mention du bonus
+        if "400kV" not in score_data["resume"]:
+            score_data["resume"] = score_data["resume"].rstrip(".") + f", bonus future 400kV (+{bonus_400kv}pts)."
     parsed["score"] = score_data
     parsed["site_origin"] = parsed.get("site_origin", "")
 
@@ -466,7 +494,7 @@ async def _find_real_parcels(params: dict) -> dict:
                     get_nearest_road(plon, plat),
                     return_exceptions=True
                 ),
-                timeout=10
+                timeout=6
             )
             if isinstance(water, dict):
                 p["dist_cours_eau_m"] = water.get("dist_cours_eau_m")
@@ -479,9 +507,35 @@ async def _find_real_parcels(params: dict) -> dict:
             pass
         return p
 
-    # Enrich top 5 parcels with Overpass data (sequential to respect rate limits)
-    for p in final_parcels[:5]:
+    # Enrich top 3 parcels with Overpass data (sequential to respect rate limits)
+    for p in final_parcels[:3]:
         await _enrich_overpass(p)
+
+    # BUG 1 FIX — Recalculer le score avec les nouvelles données eau/route
+    for p in final_parcels[:3]:
+        if p.get("dist_cours_eau_m") or p.get("dist_route_m"):
+            new_score = compute_score_simple(p)
+            bonus_400kv = p.get("future_400kv_score_bonus", 0)
+            if bonus_400kv > 0:
+                old_s = new_score["score"]
+                new_score["score"] = min(100, old_s + bonus_400kv)
+                ns = new_score["score"]
+                if ns >= 70:
+                    new_score["verdict"] = "GO"
+                elif ns >= 40:
+                    new_score["verdict"] = "A_ETUDIER"
+                else:
+                    new_score["verdict"] = "DEFAVORABLE"
+                new_score["resume"] = new_score["resume"].replace(
+                    f"Score {old_s}/100", f"Score {ns}/100"
+                )
+                for old_v in ["A_ETUDIER", "DEFAVORABLE", "GO"]:
+                    if f"— {old_v}." in new_score["resume"] and old_v != new_score["verdict"]:
+                        new_score["resume"] = new_score["resume"].replace(f"— {old_v}.", f"— {new_score['verdict']}.")
+                        break
+                if "400kV" not in new_score["resume"]:
+                    new_score["resume"] = new_score["resume"].rstrip(".") + f", bonus future 400kV (+{bonus_400kv}pts)."
+            p["score"] = new_score
 
     # Clean parcels for JSON response
     clean_parcels = []
@@ -632,13 +686,11 @@ async def process_chat_message(
 ) -> dict:
     """Process a chat message and return structured response"""
     api_key = os.environ.get("EMERGENT_LLM_KEY", "")
-    if not api_key:
-        return {
-            "type": "error",
-            "text": "Clé LLM non configurée. Contactez l'administrateur.",
-        }
 
     try:
+        if not api_key:
+            raise ValueError("Clé LLM non configurée")
+
         chat = LlmChat(
             api_key=api_key,
             session_id=f"cockpit_{session_id}",
@@ -690,30 +742,42 @@ async def process_chat_message(
                 return {"type": "error", "text": f"Erreur lors de la recherche de parcelles: {str(e)}"}
 
         elif action == "search":
+            # BUG 2 FIX — Deprecated action, redirect to find_parcels
+            logger.warning("LLM used deprecated 'search' action — redirecting to find_parcels")
             params = parsed.get("params", {})
-            results = dc_search(params)
-            return {
-                "type": "search_results",
-                "intro": intro,
-                "results": results["results"][:10],
-                "meta": results["meta"],
-                "params": params,
-                "fly_to": _get_fly_target(results["results"], params),
-            }
+            try:
+                result = await _find_real_parcels(params)
+                parcels = result["parcels"]
+                if not parcels:
+                    return {"type": "text", "text": intro + "\n\nAucune parcelle trouvée."}
+                lats = [p["latitude"] for p in parcels]
+                lngs = [p["longitude"] for p in parcels]
+                return {
+                    "type": "parcel_results",
+                    "intro": intro,
+                    "parcels": parcels,
+                    "composite_sites": result.get("composite_sites", []),
+                    "sites_searched": result["sites_searched"],
+                    "total_found": result["total_found"],
+                    "returned": result["returned"],
+                    "fly_to": {"lat": sum(lats) / len(lats), "lng": sum(lngs) / len(lngs), "zoom": 14},
+                    "params": params,
+                    "filters_applied": result.get("filters_applied", {}),
+                }
+            except Exception as e:
+                logger.error(f"search->find_parcels fallback error: {e}")
+                return {"type": "error", "text": f"Erreur: {str(e)}"}
 
         elif action == "site_detail":
+            # BUG 2 FIX — Deprecated action, try to find parcels near the site
+            logger.warning("LLM used deprecated 'site_detail' action")
             site_id = parsed.get("site_id", "")
             site = dc_get_site(site_id)
             if site:
                 return {
-                    "type": "site_detail",
+                    "type": "text",
                     "intro": intro,
-                    "site": site,
-                    "fly_to": {
-                        "lat": site["location"]["lat"],
-                        "lng": site["location"]["lng"],
-                        "zoom": 12,
-                    },
+                    "text": f"Site {site.get('name', site_id)} — {site.get('location', {}).get('region', '')}. Utilisez 'find_parcels' pour chercher des parcelles dans cette zone.",
                 }
             return {"type": "text", "text": f"Site {site_id} non trouvé."}
 
@@ -742,10 +806,73 @@ async def process_chat_message(
 
     except Exception as e:
         logger.error(f"Chat error: {e}")
+        # BUG 4 FIX — Fallback: parser directement sans LLM
+        fallback = _try_direct_parse(message)
+        if fallback and fallback.get("action") == "find_parcels":
+            try:
+                result = await _find_real_parcels(fallback["params"])
+                parcels = result["parcels"]
+                if parcels:
+                    lats = [p["latitude"] for p in parcels]
+                    lngs = [p["longitude"] for p in parcels]
+                    return {
+                        "type": "parcel_results",
+                        "intro": fallback.get("intro", "Résultats (mode fallback) :"),
+                        "parcels": parcels,
+                        "composite_sites": result.get("composite_sites", []),
+                        "sites_searched": result["sites_searched"],
+                        "total_found": result["total_found"],
+                        "returned": result["returned"],
+                        "fly_to": {"lat": sum(lats) / len(lats), "lng": sum(lngs) / len(lngs), "zoom": 14},
+                        "params": fallback["params"],
+                        "filters_applied": result.get("filters_applied", {}),
+                    }
+            except Exception as fallback_err:
+                logger.error(f"Fallback error: {fallback_err}")
         return {
             "type": "error",
             "text": f"Erreur: {str(e)}",
         }
+
+
+def _try_direct_parse(message: str) -> dict:
+    """BUG 4 FIX — Fallback: parse simple requests without LLM"""
+    import re
+    msg = message.lower().strip()
+
+    if any(word in msg for word in ["parcelle", "terrain", "trouve", "cherche", "propose"]):
+        params = {"min_surface_ha": 1.0, "nb_parcels": 10}
+
+        # Détecter la région
+        region_map = {
+            "paca": "PACA", "marseille": "PACA", "fos": "PACA", "provence": "PACA",
+            "idf": "IDF", "paris": "IDF", "île-de-france": "IDF",
+            "nord": "HdF", "lille": "HdF", "hauts-de-france": "HdF",
+            "lyon": "AuRA", "auvergne": "AuRA",
+            "bretagne": "BRE", "rennes": "BRE",
+            "nantes": "PDL", "pays de la loire": "PDL",
+        }
+        for key, region in region_map.items():
+            if key in msg:
+                params["region"] = region
+                break
+
+        # Détecter la surface
+        ha_match = re.search(r'(\d+)\s*(?:ha|hectare)', msg)
+        if ha_match:
+            params["min_surface_ha"] = float(ha_match.group(1))
+
+        # Détecter une commune spécifique
+        for prefix in ["à ", "près de ", "autour de ", "commune de "]:
+            if prefix in msg:
+                commune = msg.split(prefix)[1].split(" pour")[0].split(" de ")[0].strip().rstrip(".,;!?")
+                if len(commune) > 2:
+                    params["commune"] = commune
+                    break
+
+        return {"action": "find_parcels", "params": params, "intro": "Recherche en cours (mode direct)..."}
+
+    return None
 
 
 def _extract_json(text: str) -> dict:

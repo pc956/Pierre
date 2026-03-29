@@ -22,37 +22,25 @@ Plateforme de prospection foncière pour data centers en France. Interface IA-Fi
 - [x] Recherche par commune + parallélisation + cache GPU
 - [x] PDF "Fiche d'Opportunité" + SYSTEM_PROMPT simplifié + Score breakdown + Agrégation adjacentes
 
-### V2 Correctifs (29/03/2026)
+### V2 Correctifs
 - [x] 5 couches carte (zones indus GPU, heatmap MW, inondables, cours d'eau WMS, routes)
 - [x] DVF réel cascade (commune API → dept → région fallback)
 - [x] Nettoyage complet project_type
 
-### V3 Correctifs (29/03/2026)
-- [x] Distance cours d'eau (Overpass API) — dist_cours_eau_m, nom_cours_eau
-- [x] Distance route principale (Overpass API) — dist_route_m, nom_route, type_route
-- [x] Suggestions rapides chatbot (5 pills)
-- [x] Liens Google Maps Satellite + Street View dans ParcelDetail
+### V3 Correctifs
+- [x] Distance cours d'eau (Overpass API) + Distance route principale (Overpass API)
+- [x] Suggestions rapides chatbot (5 pills) + Liens Satellite + Street View
 - [x] Mode comparaison (2-3 parcelles côte-à-côte)
-- [x] Eau + route intégrés dans scoring resume et PDF
 
-## Score structure
-```json
-{
-  "score": 75, "verdict": "GO",
-  "detail": {"distance_rte": 35, "mw_disponibles": 25, "plu": 15, "surface": 10, "malus": -10},
-  "flags": ["ZONE INONDABLE (PPRI)"],
-  "resume": "Score 75/100 — GO. 3.2 ha en zone PLU UX à 1.2km du poste FEUILLANE (225kV), cours d'eau à 1.2km..."
-}
-```
+### V4 Bugfixes agent IA (29/03/2026)
+- [x] BUG 1: Resume contient désormais eau/route (recalcul post-Overpass)
+- [x] BUG 2: SYSTEM_PROMPT simplifié (actions search/site_detail supprimées, fallback vers find_parcels)
+- [x] BUG 3: Verdict cohérent après bonus 400kV (GO correct si score passe 70+)
+- [x] BUG 4: Fallback sans LLM (_try_direct_parse pour requêtes simples)
+- [x] BUG 5: Reconstruction code_commune si vide (via api_search_communes)
 
 ## Backlog
 - [ ] **P1**: Overlay risques Géorisques vectoriel sur carte
 - [ ] **P2**: Mode COMEX (vue exécutive)
 - [ ] **P2**: Alertes automatiques
 - [ ] **P3**: PDF comparatifs auto (2+ parcelles shortlistées)
-
-## Endpoints clés
-- `POST /api/chat` — Chatbot IA
-- `GET /api/france/gpu-zones` — Zones industrielles par bbox
-- `POST /api/export/pdf` — Fiche d'Opportunité PDF
-- `GET /api/parcels/{id}/score` — Score universel
