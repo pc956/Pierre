@@ -1,0 +1,96 @@
+{
+  "summary": "Chatbot Parcel Search Feature Test (Iteration 11) - All 15 backend tests passed. Frontend fully functional with parcel_results rendering, parcel cards with cadastral refs, fly-to on click, and updated quick actions.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "=== CHATBOT PARCEL SEARCH (6/6) ===",
+    "POST /api/chat with 'Trouve des parcelles 30MW PACA 2ha minimum' returns type=parcel_results",
+    "Each parcel has required fields: parcel_id, ref_cadastrale, commune, latitude, longitude, surface_ha, dist_poste_htb_m, tension_htb_kv, plu_zone, dvf_prix_median_m2, score, site_origin",
+    "Parcels sorted by score descending",
+    "Response includes sites_searched array with substation info (name, lat, lng, grid)",
+    "Response includes fly_to coordinates for map centering",
+    "Parcels have real cadastral references (e.g., 130390000B0190 in Fos-sur-Mer)",
+    "=== MACRO SEARCH STILL WORKS (1/1) ===",
+    "POST /api/chat with 'Sites en PACA' returns type=search_results",
+    "=== SUMMARY STILL WORKS (1/1) ===",
+    "POST /api/chat with 'Résumé S3REnR' returns type=summary",
+    "=== PARCEL SEARCH VARIATIONS (2/2) ===",
+    "Parcel search with HdF region works",
+    "Parcel search with 'Terrains 2ha+ près de Fos' works",
+    "=== DATA QUALITY (3/3) ===",
+    "Parcels respect minimum surface filter (2ha minimum)",
+    "Parcels have HTB distance calculated (dist_poste_htb_m > 0)",
+    "Parcels include future 400kV line data (dist_future_400kv_m, future_400kv_score_bonus)",
+    "=== ENDPOINT BASICS (2/2) ===",
+    "POST /api/chat endpoint exists and returns 200",
+    "Chat endpoint returns valid JSON with 'type' field",
+    "=== FRONTEND DESKTOP ===",
+    "Dashboard loads with COCKPIT IMMO header",
+    "Chatbot open button visible (data-testid='chatbot-open-btn')",
+    "Chatbot panel opens with updated quick actions",
+    "Quick actions: 'Trouve des parcelles 30MW PACA', 'Terrains 2ha+ près de Fos', 'Parcelles zone industrielle HdF', 'Résumé S3REnR'",
+    "Chat input and send button work correctly",
+    "Parcel search returns parcel_results with 3 parcel cards",
+    "Parcel cards show: ref_cadastrale, surface (ha), score, commune, HTB distance, PLU zone, 400kV info",
+    "Clicking parcel card flies map to parcel location",
+    "Clicking parcel card selects parcel in sidebar (shows ParcelDetail)",
+    "ParcelDetail shows Future 400kV section with distance, zone, bonus scoring",
+    "=== PREVIOUS FEATURES VERIFIED ===",
+    "GET /api/map/rte-future-400kv returns line + buffers (future 400kV still works)",
+    "GET /api/dvf/commune/13039 returns DVF data (DVF still works)",
+    "POST /api/export/pdf returns valid PDF (PDF export still works)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_chatbot_parcel_search.py",
+    "/app/test_reports/pytest/pytest_results_chatbot_parcel.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_chatbot_parcel_search.py"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 tests passed)",
+    "frontend": "100% (all features working)"
+  },
+  "test_credentials": "Cookie: session_token=test_session_token_2026",
+  "seed_data_creation": "No seed data needed - uses real IGN Carto API for cadastral parcels",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Chatbot parcel search feature fully tested. Key endpoints: 1) POST /api/chat with parcel search query (e.g., 'Trouve des parcelles 30MW PACA 2ha minimum') returns type=parcel_results with real cadastral parcels from IGN API. 2) Each parcel has: parcel_id, ref_cadastrale, commune, latitude, longitude, surface_ha, dist_poste_htb_m, tension_htb_kv, plu_zone, dvf_prix_median_m2, score, site_origin, dist_future_400kv_m, future_400kv_buffer, future_400kv_score_bonus. 3) Response includes sites_searched array and fly_to coordinates. Frontend: ChatBot.js renders parcel_results with clickable parcel cards. Clicking a card calls onSelectParcelFromChat which sets selectedParcel in Dashboard.js and flies map to parcel location. Quick actions updated to parcel-focused queries. Response time for parcel search is 5-15 seconds due to IGN API calls.",
+  "feature_verification": {
+    "chat_parcel_search": {
+      "url": "POST /api/chat",
+      "example_message": "Trouve des parcelles 30MW PACA 2ha minimum",
+      "returns": "type=parcel_results with parcels array, sites_searched, fly_to"
+    },
+    "parcel_fields": [
+      "parcel_id", "ref_cadastrale", "commune", "departement", "region",
+      "latitude", "longitude", "surface_m2", "surface_ha",
+      "dist_poste_htb_m", "tension_htb_kv", "nearest_htb_name",
+      "dist_landing_point_km", "landing_point_nom",
+      "plu_zone", "plu_libelle", "dvf_prix_median_m2",
+      "dist_future_400kv_m", "future_400kv_buffer", "future_400kv_score_bonus",
+      "score (score_net, verdict, power_mw_p50)", "site_origin"
+    ],
+    "quick_actions": [
+      "Trouve des parcelles 30MW PACA",
+      "Terrains 2ha+ près de Fos",
+      "Parcelles zone industrielle HdF",
+      "Résumé S3REnR"
+    ],
+    "frontend_components": {
+      "ChatBot.js": "Renders parcel_results with clickable parcel cards (data-testid='chat-parcel-{i}')",
+      "Dashboard.js": "onSelectParcelFromChat prop passed to ChatBot, calls setSelectedParcel"
+    },
+    "response_time": "5-15 seconds (IGN API + LLM parsing)"
+  },
+  "mocked_api_note": "No mocked APIs - uses real IGN Carto API for cadastral parcels and Emergent LLM key for NLP parsing"
+}

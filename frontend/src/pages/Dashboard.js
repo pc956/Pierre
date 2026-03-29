@@ -1468,6 +1468,13 @@ export default function Dashboard() {
       <ChatBot
         onFlyTo={(lat, lng, zoom) => setChatFlyTarget({ lat, lng, zoom })}
         onHighlightSites={(ids) => { /* Future: highlight sites on map */ }}
+        onSelectParcelFromChat={(parcel) => {
+          // Create a compatible parcel object for selection
+          setSelectedParcel({
+            ...parcel,
+            source: 'chat_assistant',
+          });
+        }}
       />
 
       {/* SIREN Modal */}

@@ -4,7 +4,7 @@ import axios from 'axios';
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
-export default function ChatBot({ onFlyTo, onHighlightSites }) {
+export default function ChatBot({ onFlyTo, onHighlightSites, onSelectParcelFromChat }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
     { role: 'assistant', type: 'text', content: 'Bonjour ! Je suis votre assistant Cockpit Immo. Posez-moi une question sur les terrains pour data centers.\n\nExemples :\n• "Trouve 5 sites pour un DC de 50MW en PACA"\n• "Quels sont les postes non saturés dans le Nord ?"\n• "Résumé des capacités S3REnR"' }
@@ -60,7 +60,21 @@ export default function ChatBot({ onFlyTo, onHighlightSites }) {
   };
 
   const handleResponse = (data) => {
-    if (data.type === 'search_results') {
+    if (data.type === 'parcel_results') {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        type: 'parcel_results',
+        content: data.intro || 'Voici les parcelles trouvées :',
+        parcels: data.parcels,
+        sites_searched: data.sites_searched,
+        total_found: data.total_found,
+        returned: data.returned,
+        params: data.params,
+      }]);
+      if (data.fly_to && onFlyTo) {
+        onFlyTo(data.fly_to.lat, data.fly_to.lng, data.fly_to.zoom);
+      }
+    } else if (data.type === 'search_results') {
       setMessages(prev => [...prev, {
         role: 'assistant',
         type: 'search_results',
@@ -180,7 +194,15 @@ export default function ChatBot({ onFlyTo, onHighlightSites }) {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3" style={{ scrollBehavior: 'smooth' }}>
         {messages.map((msg, i) => (
-          <ChatMessage key={i} msg={msg} onSiteClick={(id) => quickAction(`détails du site ${id}`)} />
+          <ChatMessage 
+            key={i} 
+            msg={msg} 
+            onSiteClick={(id) => quickAction(`détails du site ${id}`)} 
+            onParcelClick={(parcel) => {
+              if (onFlyTo) onFlyTo(parcel.latitude, parcel.longitude, 17);
+              if (onSelectParcelFromChat) onSelectParcelFromChat(parcel);
+            }}
+          />
         ))}
         {loading && (
           <div className="flex items-center gap-2 px-3 py-2">
@@ -195,9 +217,9 @@ export default function ChatBot({ onFlyTo, onHighlightSites }) {
       {messages.length <= 2 && (
         <div className="px-3 py-2 flex flex-wrap gap-1.5 shrink-0" style={{ borderTop: '1px solid #1f1f2e' }}>
           {[
-            '50MW en PACA',
-            '20MW IDF rapide',
-            'Sites HdF réseau dispo',
+            'Trouve des parcelles 30MW PACA',
+            'Terrains 2ha+ près de Fos',
+            'Parcelles zone industrielle HdF',
             'Résumé S3REnR',
           ].map(q => (
             <button
@@ -247,7 +269,7 @@ export default function ChatBot({ onFlyTo, onHighlightSites }) {
 }
 
 
-function ChatMessage({ msg, onSiteClick }) {
+function ChatMessage({ msg, onSiteClick, onParcelClick }) {
   const isUser = msg.role === 'user';
 
   return (
@@ -307,6 +329,74 @@ function ChatMessage({ msg, onSiteClick }) {
             {msg.results.length > 5 && (
               <p className="text-[10px] text-center" style={{ color: '#8f8f9d' }}>
                 +{msg.results.length - 5} autres résultats
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Parcel results (real cadastral parcels) */}
+        {msg.type === 'parcel_results' && msg.parcels && (
+          <div className="mt-2 space-y-1.5">
+            <div className="text-[10px] flex justify-between" style={{ color: '#8f8f9d' }}>
+              <span>{msg.total_found} parcelles trouvées</span>
+              <span>{msg.returned} affichées</span>
+            </div>
+            {msg.sites_searched && msg.sites_searched.length > 0 && (
+              <div className="text-[10px] px-2 py-1 rounded" style={{ background: '#0a0a0f', border: '1px solid #1f1f2e', color: '#8f8f9d' }}>
+                Recherche autour de : {msg.sites_searched.map(s => `${s.name} (${s.grid.mw_dispo}MW)`).join(', ')}
+              </div>
+            )}
+            {msg.parcels.slice(0, 10).map((p, i) => {
+              const scoreVal = p.score?.score_net || 0;
+              const scoreColor = scoreVal >= 70 ? '#2ed573' : scoreVal >= 40 ? '#ffa502' : '#ff4757';
+              return (
+                <div
+                  key={p.parcel_id}
+                  className="p-2 rounded cursor-pointer hover:opacity-80 transition-all"
+                  style={{ background: '#12121a', border: '1px solid #1f1f2e' }}
+                  onClick={() => onParcelClick && onParcelClick(p)}
+                  data-testid={`chat-parcel-${i}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-[11px]" style={{ color: '#e8e8ed' }}>
+                      {p.ref_cadastrale || p.parcel_id}
+                    </span>
+                    <span className="font-mono text-[10px] px-1.5 rounded" style={{
+                      background: scoreColor + '22',
+                      color: scoreColor,
+                    }}>
+                      {scoreVal.toFixed(0)}/100
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1 text-[10px] flex-wrap" style={{ color: '#8f8f9d' }}>
+                    <span><MapPin size={9} className="inline" /> {p.commune || p.region}</span>
+                    <span className="font-bold" style={{ color: '#00d4aa' }}>{p.surface_ha?.toFixed(2)} ha</span>
+                    <span>HTB: {(p.dist_poste_htb_m / 1000).toFixed(1)}km</span>
+                    {p.plu_zone && p.plu_zone !== 'inconnu' && (
+                      <span className="px-1 rounded" style={{ background: '#3b82f622', color: '#3b82f6' }}>
+                        PLU {p.plu_zone}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5 text-[10px]" style={{ color: '#8f8f9d' }}>
+                    <span>{p.tension_htb_kv}kV</span>
+                    {p.dvf_prix_median_m2 > 0 && <span>{p.dvf_prix_median_m2}€/m²</span>}
+                    <span>LP: {p.dist_landing_point_km}km</span>
+                    {p.future_400kv_buffer && (
+                      <span className="px-1 rounded" style={{ background: '#ff004022', color: '#ff4757' }}>
+                        400kV {p.future_400kv_buffer}
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 text-[9px]" style={{ color: '#00d4aa88' }}>
+                    {p.score?.verdict} · {p.site_origin}
+                  </div>
+                </div>
+              );
+            })}
+            {msg.total_found > msg.returned && (
+              <p className="text-[10px] text-center" style={{ color: '#8f8f9d' }}>
+                +{msg.total_found - msg.returned} parcelles non affichées
               </p>
             )}
           </div>
