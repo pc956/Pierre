@@ -448,6 +448,9 @@ async def _find_real_parcels(params: dict) -> dict:
             seen.add(pid)
             unique_parcels.append(p)
 
+    # ── ÉTAPE 9: Agrégation parcelles adjacentes ──
+    composite_sites = _aggregate_adjacent(unique_parcels)
+
     final_parcels = unique_parcels[:nb_parcels_max]
 
     # Clean parcels for JSON response
@@ -489,6 +492,7 @@ async def _find_real_parcels(params: dict) -> dict:
 
     return {
         "parcels": clean_parcels,
+        "composite_sites": composite_sites,
         "sites_searched": sites_searched,
         "total_found": len(unique_parcels),
         "returned": len(clean_parcels),
@@ -501,6 +505,84 @@ async def _find_real_parcels(params: dict) -> dict:
             "commune": commune_name,
         },
     }
+
+
+# ═══════════════════════════════════════════════════════════
+# ÉTAPE 9: AGRÉGATION PARCELLES ADJACENTES
+# ═══════════════════════════════════════════════════════════
+
+def _aggregate_adjacent(parcels: list, max_gap_m: float = 100.0) -> list:
+    """Detect composite sites: parcels within max_gap_m of each other.
+    Returns list of composite sites with aggregated score."""
+    if len(parcels) < 2:
+        return []
+
+    # Build adjacency clusters using Union-Find
+    parent = list(range(len(parcels)))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    # Check pairwise distances (O(n²) but n is typically < 50)
+    for i in range(len(parcels)):
+        pi = parcels[i]
+        for j in range(i + 1, len(parcels)):
+            pj = parcels[j]
+            dist = _haversine(pi["longitude"], pi["latitude"], pj["longitude"], pj["latitude"])
+            if dist <= max_gap_m:
+                union(i, j)
+
+    # Group parcels by cluster
+    clusters = {}
+    for i in range(len(parcels)):
+        root = find(i)
+        if root not in clusters:
+            clusters[root] = []
+        clusters[root].append(parcels[i])
+
+    # Build composite sites (only clusters with 2+ parcels)
+    composites = []
+    for cluster_parcels in clusters.values():
+        if len(cluster_parcels) < 2:
+            continue
+
+        total_surface_m2 = sum(p.get("surface_m2", 0) for p in cluster_parcels)
+        total_surface_ha = total_surface_m2 / 10000
+        avg_lat = sum(p["latitude"] for p in cluster_parcels) / len(cluster_parcels)
+        avg_lng = sum(p["longitude"] for p in cluster_parcels) / len(cluster_parcels)
+
+        # Best scoring parcel in the cluster
+        best = max(cluster_parcels, key=lambda p: p.get("score", {}).get("score", 0))
+
+        # Rescore the composite site with aggregated surface
+        composite_data = {**best}
+        composite_data["surface_ha"] = total_surface_ha
+        composite_data["surface_m2"] = total_surface_m2
+        composite_score = compute_score_simple(composite_data)
+
+        composites.append({
+            "type": "composite_site",
+            "nb_parcels": len(cluster_parcels),
+            "parcel_ids": [p["parcel_id"] for p in cluster_parcels],
+            "refs": [p.get("ref_cadastrale", "") for p in cluster_parcels],
+            "surface_totale_ha": round(total_surface_ha, 2),
+            "latitude": avg_lat,
+            "longitude": avg_lng,
+            "commune": best.get("commune", ""),
+            "score": composite_score,
+            "best_parcel_score": best.get("score", {}).get("score", 0),
+        })
+
+    composites.sort(key=lambda c: -(c.get("score", {}).get("score", 0)))
+    return composites
 
 
 # ═══════════════════════════════════════════════════════════
@@ -559,6 +641,7 @@ async def process_chat_message(
                     "type": "parcel_results",
                     "intro": intro,
                     "parcels": parcels,
+                    "composite_sites": result.get("composite_sites", []),
                     "sites_searched": result["sites_searched"],
                     "total_found": result["total_found"],
                     "returned": result["returned"],

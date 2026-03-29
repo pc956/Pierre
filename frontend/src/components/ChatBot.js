@@ -66,6 +66,7 @@ export default function ChatBot({ onFlyTo, onHighlightSites, onSelectParcelFromC
         type: 'parcel_results',
         content: data.intro || 'Voici les parcelles trouvées :',
         parcels: data.parcels,
+        composite_sites: data.composite_sites || [],
         sites_searched: data.sites_searched,
         total_found: data.total_found,
         returned: data.returned,
@@ -506,6 +507,39 @@ function ChatMessage({ msg, onSiteClick, onParcelClick }) {
               <p className="text-[10px] text-center" style={{ color: '#8f8f9d' }}>
                 +{msg.total_found - msg.returned} parcelles non affichées
               </p>
+            )}
+            {/* Composite sites (Étape 9) */}
+            {msg.composite_sites && msg.composite_sites.length > 0 && (
+              <div className="mt-2 pt-2" style={{ borderTop: '1px solid #1f1f2e' }}>
+                <p className="text-[10px] font-bold mb-1" style={{ color: '#ffa502' }}>
+                  Sites composites détectés ({msg.composite_sites.length})
+                </p>
+                {msg.composite_sites.map((cs, ci) => {
+                  const csScore = cs.score?.score || 0;
+                  const csColor = csScore >= 70 ? '#2ed573' : csScore >= 40 ? '#ffa502' : '#ff4757';
+                  return (
+                    <div
+                      key={ci}
+                      className="p-2 rounded mt-1 cursor-pointer hover:opacity-80"
+                      style={{ background: '#0a0a0f', border: `1px solid ${csColor}33` }}
+                      onClick={() => onParcelClick && onParcelClick({ latitude: cs.latitude, longitude: cs.longitude, parcel_id: cs.parcel_ids[0], ref_cadastrale: cs.refs[0], commune: cs.commune, score: cs.score })}
+                      data-testid={`composite-site-${ci}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold" style={{ color: '#ffa502' }}>
+                          {cs.nb_parcels} parcelles · {cs.surface_totale_ha} ha
+                        </span>
+                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded font-bold" style={{ background: csColor + '22', color: csColor }}>
+                          {csScore}/100
+                        </span>
+                      </div>
+                      <p className="text-[9px] mt-0.5" style={{ color: '#8f8f9d' }}>
+                        {cs.commune} · Refs: {cs.refs.slice(0, 3).join(', ')}{cs.refs.length > 3 ? '...' : ''}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}

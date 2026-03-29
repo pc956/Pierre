@@ -1,56 +1,53 @@
 # Cockpit Immo - PRD
 
-## Énoncé du problème
-Plateforme de prospection foncière pour data centers en France. Backend FastAPI/MongoDB + Frontend React/Leaflet thème sombre.
+## Problème original
+Plateforme de prospection foncière pour data centers en France. Interface IA-First via chatbot, carte Leaflet, scoring multi-critères, données PLU réelles, export PDF.
 
-## Architecture technique
-- **Backend**: FastAPI + MongoDB
-- **Frontend**: React + TailwindCSS + React-Leaflet
-- **Auth**: Google OAuth via Emergent Auth
-- **LLM**: GPT-4o-mini via Emergent LLM Key
-- **APIs externes**: IGN Carto (cadastre), GPU (urbanisme/PLU/prescriptions/infos)
+## Architecture
+- **Backend**: FastAPI + MongoDB + Emergent LLM (GPT-4.1-mini)
+- **Frontend**: React + TailwindCSS + React-Leaflet + Shadcn/UI
+- **Auth**: Emergent Google Auth
+- **APIs externes**: IGN Carto (cadastre), GPU (urbanisme), Géorisques, Geo API gouv.fr
 
 ## Fonctionnalités implémentées
 
-### Phase 1-4 — MVP
-- [x] Carte + infra + S3REnR + mobile + PLU + API DC + chatbot + DVF + PDF
+### V1 MVP (sessions précédentes)
+- [x] Carte Leaflet dark avec couches infra (HTB, lignes 400/225kV, LP, câbles, DC)
+- [x] Chatbot IA (GPT-4.1-mini) — interface exclusive
+- [x] Parcelles cadastrales IGN dynamiques
+- [x] PLU dynamique via GPU API
+- [x] S3REnR données réseau par région
+- [x] Ligne future 400kV Fos→Jonquières avec buffers
+- [x] Export PDF
+- [x] Google Auth Emergent
 
-### Phase 5 — Future ligne 400kV
-- [x] Tracé + buffers + scoring + couche toggleable
+### V2 Refonte complète (29/03/2026)
+- [x] **Étape 1**: Score universel /100 (4 axes: RTE/40, MW/30, PLU/20, Surface/10 + malus)
+- [x] **Étape 2**: Données réelles — S3REnR postes, fibre population, Géorisques risques, DVF prix
+- [x] **Étape 3**: Recherche par commune (Geo API → code INSEE → postes HTB)
+- [x] **Étape 4**: Parallélisation asyncio.gather + cache GPU mémoire
+- [x] **Étape 5**: Couches carte (postes, lignes, LP, câbles, DC, future 400kV)
+- [x] **Étape 6**: PDF "Fiche d'Opportunité" (2 pages: synthèse + plan d'action)
+- [x] **Étape 7**: SYSTEM_PROMPT simplifié sans project_type
+- [x] **Étape 8**: Score breakdown barres dans chatbot et panel détail
+- [x] **Étape 9**: Agrégation parcelles adjacentes (sites composites < 100m)
 
-### Phase 6-7 — Chatbot parcelles + Filtres + Optim N+1
-- [x] Recherche parcelles cadastrales réelles + filtres avancés
-- [x] Auto-expansion rayon de recherche selon critères (HTB distance, surface min)
-
-### Phase 8-10 — Scoring PLU complet
-- [x] Statique (code zone) + Dynamique GPU (prescriptions + infos + destination)
-- [x] Indicateur de confiance (haute/moyenne/basse)
-- [x] Composite : dynamique prioritaire → fallback statique
-
-### Phase 11 — Interface AI-First
-- [x] Suppression complète du tableau (ParcelsTable)
-- [x] Suppression des filtres manuels / barre de recherche
-- [x] Suppression de la navigation Carte/Tableau (activeView)
-- [x] Suppression de la navigation mobile bottom (Carte/Tableau/Stats)
-- [x] Ajout import Building2 manquant
-- [x] Implémentation loadParcelsAroundPoint (popups postes HTB / landing points)
-- [x] Interface 100% pilotée par l'Agent IA (chatbot)
-
-## Endpoints API
-| Endpoint | Méthode | Description |
-|----------|---------|-------------|
-| `/api/scoring/plu-dynamic` | GET | Score PLU dynamique GPU |
-| `/api/scoring/plu/{zone}` | GET | Score PLU statique |
-| `/api/scoring/plu` | POST | Score PLU avec ajustements |
-| `/api/chat` | POST | Chatbot IA (parcelles + scoring dynamique) |
-| `/api/dc/search` | POST | Recherche DC |
-| `/api/map/rte-future-400kv` | GET | Future 400kV |
-| `/api/export/pdf/{id}` | GET | Export PDF |
-| `/api/france/parcelles/bbox` | GET | Parcelles par BBox viewport |
-| `/api/france/parcelles/commune/{code}` | GET | Parcelles par commune |
+## Verdicts scoring
+- **GO** (≥70): Site prometteur
+- **À ÉTUDIER** (40-69): Potentiel à confirmer
+- **DÉFAVORABLE** (<40): Difficultés majeures
+- **EXCLU**: Zone non constructible (A, N)
 
 ## Backlog
-- [ ] **P1**: Couches risques environnementaux (inondations, sismique)
+- [ ] **P1**: Couches risques environnementaux (flood, seismic) sur carte
 - [ ] **P2**: Comparaison côte-à-côte de sites
 - [ ] **P2**: Mode COMEX (vue exécutive)
 - [ ] **P2**: Alertes automatiques
+- [ ] **P3**: PDF comparatifs auto (2+ parcelles shortlistées)
+
+## Endpoints clés
+- `POST /api/chat` — Chatbot IA (recherche parcelles, commune, résumé)
+- `GET /api/map/rte-future-400kv` — Future ligne 400kV GeoJSON
+- `POST /api/export/pdf` — Fiche d'Opportunité PDF
+- `GET /api/s3renr/summary` — Résumé régional
+- `GET /api/france/parcelles/bbox` — Parcelles par viewport
