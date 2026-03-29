@@ -17,18 +17,11 @@ def generate_id(prefix: str = "") -> str:
 # ENUMS
 # ═══════════════════════════════════════════════════
 
-class ProjectType(str, Enum):
-    HYPERSCALE = "hyperscale"
-    COLOCATION_T3 = "colocation_t3"
-    COLOCATION_T4 = "colocation_t4"
-    EDGE = "edge"
-    AI_CAMPUS = "ai_campus"
-
-
 class Verdict(str, Enum):
     GO = "GO"
-    CONDITIONNEL = "CONDITIONNEL"
-    NO_GO = "NO_GO"
+    A_ETUDIER = "A_ETUDIER"
+    DEFAVORABLE = "DEFAVORABLE"
+    EXCLU = "EXCLU"
 
 
 class UrbaCompatibilite(str, Enum):
@@ -220,21 +213,13 @@ class ParcelScore(BaseModel):
     
     score_id: str = Field(default_factory=lambda: generate_id("score_"))
     parcel_id: str
-    project_type: ProjectType
     
-    # Verdict global
-    verdict: Verdict = Verdict.CONDITIONNEL
-    verdict_raison: Optional[str] = None
-    risque_global: str = "moyen"
-    
-    # Éligibilité
-    eligibility_status: str = "eligible"
-    eligibility_blockers: List[str] = []
-    
-    # TTM
-    ttm_min_months: Optional[int] = None
-    ttm_max_months: Optional[int] = None
-    ttm_bottleneck: Optional[str] = None
+    # Score universel /100
+    score: int = 0
+    verdict: Verdict = Verdict.A_ETUDIER
+    detail: dict = {}
+    flags: List[str] = []
+    resume: str = ""
     
     # Raccordement
     racc_delai_min_mois: Optional[int] = None
@@ -314,7 +299,6 @@ class Shortlist(BaseModel):
     tenant_id: str
     nom: str
     description: Optional[str] = None
-    project_type: Optional[ProjectType] = None
     share_token: str = Field(default_factory=lambda: uuid.uuid4().hex)
     created_by: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

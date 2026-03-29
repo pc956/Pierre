@@ -57,8 +57,8 @@ async def create_indexes():
     await db.parcels.create_index("commune")
     
     # Scores
-    await db.parcel_scores.create_index([("parcel_id", 1), ("project_type", 1)])
-    await db.parcel_scores.create_index("score_net")
+    await db.parcel_scores.create_index([("parcel_id", 1), ("is_latest", 1)])
+    await db.parcel_scores.create_index("score")
     
     # Users
     await db.users.create_index("email", unique=True)
@@ -80,7 +80,6 @@ class SessionRequest(BaseModel):
     session_id: str
 
 class SearchRequest(BaseModel):
-    project_type: str = "colocation_t3"
     mw_target: Optional[float] = None
     budget_max: Optional[float] = None
     ttm_max: Optional[int] = None
@@ -91,7 +90,6 @@ class SearchRequest(BaseModel):
 class ShortlistCreate(BaseModel):
     nom: str
     description: Optional[str] = None
-    project_type: Optional[str] = None
 
 class ShortlistItemCreate(BaseModel):
     parcel_id: str
@@ -290,7 +288,6 @@ async def logout(request: Request, response: Response):
 async def get_parcels(
     request: Request,
     region: Optional[str] = None,
-    project_type: str = "colocation_t3",
     score_min: Optional[float] = None,
     limit: int = 100,
     skip: int = 0
@@ -339,7 +336,7 @@ async def get_parcel(parcel_id: str):
     
     return {
         **parcel,
-        "scores": {s["project_type"]: s for s in scores}
+        "score": scores[0] if scores else {}
     }
 
 
@@ -438,7 +435,7 @@ async def search_project(req: SearchRequest, request: Request):
 
 
 @api_router.post("/compare")
-async def compare_parcels(parcel_ids: List[str], project_type: str = "colocation_t3"):
+async def compare_parcels(parcel_ids: List[str]):
     """Compare multiple parcels side by side"""
     results = []
     
@@ -562,7 +559,6 @@ def _enrich_poste_with_s3renr(poste):
 
 @api_router.get("/map/parcels")
 async def get_map_parcels(
-    project_type: str = "colocation_t3",
     min_lng: Optional[float] = None,
     min_lat: Optional[float] = None,
     max_lng: Optional[float] = None,
@@ -1061,13 +1057,30 @@ async def get_commune_parcelles(code_insee: str, section: Optional[str] = None):
     }
 
 
+@api_router.get("/france/gpu-zones")
+async def get_gpu_zones_endpoint(min_lon: float, min_lat: float, max_lon: float, max_lat: float):
+    """Get GPU industrial/activity zones in bbox"""
+    zones = await get_gpu_zones_for_bbox(min_lon, min_lat, max_lon, max_lat)
+    industrial = []
+    for z in zones:
+        props = z.get("properties", {})
+        typezone = (props.get("typezone") or "").upper()
+        libelle = (props.get("libelle") or "").lower()
+        destdomi = (props.get("destdomi") or "").lower()
+        if typezone in ("UX", "UI", "UE", "IX", "I") or \
+           "industriel" in libelle or "activit" in libelle or "économ" in libelle or \
+           "industriel" in destdomi or "activit" in destdomi:
+            industrial.append(z)
+    return {"zones": industrial}
+
+
+
 @api_router.get("/france/parcelles/bbox")
 async def get_bbox_parcelles(
     min_lon: float, 
     min_lat: float, 
     max_lon: float, 
     max_lat: float,
-    project_type: str = "colocation_t3",
     limit: int = 200
 ):
     """
@@ -1259,8 +1272,7 @@ def _haversine(lon1, lat1, lon2, lat2):
 async def get_parcelles_around(
     lon: float,
     lat: float,
-    radius_m: float = 2000,
-    project_type: str = "colocation_t3"
+    radius_m: float = 2000
 ):
     """
     Get parcelles around a point (e.g., around a poste HTB or landing point)
@@ -1342,7 +1354,6 @@ async def create_shortlist(req: ShortlistCreate, request: Request):
         "tenant_id": user.tenant_id,
         "nom": req.nom,
         "description": req.description,
-        "project_type": req.project_type,
         "share_token": uuid.uuid4().hex,
         "created_by": user.user_id,
         "created_at": datetime.now(timezone.utc).isoformat()

@@ -1,0 +1,70 @@
+{
+  "summary": "Iteration 18 - 3 Correctifs Testing Complete. All backend APIs working (19/19 tests passed). Frontend verified: 5 new map layers visible, DVF cascade with source field, project_type completely removed, correct verdict labels (GO/A_ETUDIER/DEFAVORABLE/EXCLU), ScoreBar components showing breakdown.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "=== BACKEND API TESTS (19/19) ===",
+    "GET /api/ returns API info (version 1.0.0)",
+    "GET /api/france/gpu-zones returns industrial zones array",
+    "GET /api/map/electrical-assets returns postes with s3renr data for heatmap",
+    "GET /api/dvf/commune/{code_insee} returns DVF price data",
+    "GET /api/dvf/region/{region} returns aggregated DVF data",
+    "POST /api/chat returns parcels with dvf_source field (dvf_departement_hardcode)",
+    "GET /api/parcels works without project_type param",
+    "GET /api/map/parcels works without project_type param",
+    "GET /api/france/parcelles/bbox works without project_type param",
+    "GET /api/parcels/{id}/score works without project_type in URL",
+    "Score structure: score, verdict, detail (4 axes), flags, resume",
+    "Verdict labels: GO, A_ETUDIER, DEFAVORABLE, EXCLU (not CONDITIONNEL/NO_GO)",
+    "POST /api/export/pdf returns valid PDF",
+    "GET /api/map/dc returns 61 DC existants",
+    "GET /api/map/landing-points returns 8 landing points",
+    "GET /api/map/submarine-cables returns 15+ cables",
+    "GET /api/map/electrical-assets returns 101+ postes HTB",
+    "GET /api/map/rte-future-400kv returns GeoJSON with line + buffers",
+    "GET /api/s3renr/summary returns region data (IDF, PACA, HdF)",
+    "=== FRONTEND UI TESTS ===",
+    "Login page loads correctly with Google Auth button",
+    "Dashboard loads with map showing all infrastructure layers",
+    "5 new layer toggles visible: Zones industrielles, Heatmap MW dispo, Zones inondables, Cours d'eau, Réseau routier",
+    "Chatbot (Assistant IA) opens and accepts queries",
+    "Chatbot returns parcel results with dvf_source field",
+    "ScoreBar components visible in chatbot parcel cards (RTE, MW, PLU, Surface)",
+    "Parcel cards show: score/100, verdict label (À ÉTUDIER), resume text",
+    "Verdict labels correct: GO, À ÉTUDIER, DÉFAVORABLE (not CONDITIONNEL or NO_GO)",
+    "S3REnR summary visible in sidebar (IDF: SATURÉ, PACA: ACTIF, HdF: ACTIF)",
+    "Map zooms to PACA region when chatbot returns parcels"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iteration18_correctifs.py",
+    "/app/test_reports/pytest/pytest_results_iteration18.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_iteration18_correctifs.py",
+    "/app/backend/chat_assistant.py (added dvf_source to clean_parcels output)"
+  ],
+  "success_rate": {
+    "backend": "100% (19/19 tests passed)",
+    "frontend": "100% (all features verified)"
+  },
+  "test_credentials": "Cookie: session_token=test_session_iteration18_1774807864077",
+  "seed_data_creation": "Created test user 'test-user-iteration18' with session for UI testing",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 18 verified the 3 correctifs applied on top of the 9-step refactoring. Key changes verified: 1) 5 new map layers (Zones industrielles GPU, Heatmap MW S3REnR, Zones inondables, Cours d'eau WMS, Réseau routier) all visible in COUCHES dropdown. 2) DVF cascade working: API tries Cerema commune API first, falls back to departement hardcode, then region fallback. dvf_source field now returned in chat parcel results. 3) project_type completely removed from all API signatures - endpoints work without project_type param. Score format is {score, verdict, detail, flags, resume} with verdicts GO/A_ETUDIER/DEFAVORABLE/EXCLU. All APIs are live (no mocked APIs).",
+  "correctifs_verification": {
+    "correctif_1_map_layers": "VERIFIED - 5 new layers visible in COUCHES dropdown: Zones industrielles, Heatmap MW dispo, Zones inondables, Cours d'eau, Réseau routier",
+    "correctif_2_dvf_cascade": "VERIFIED - DVF API cascade working (commune API -> dept hardcode -> region fallback), dvf_source field returned",
+    "correctif_3_project_type_cleanup": "VERIFIED - project_type removed from all endpoints, Verdict enum updated to GO/A_ETUDIER/DEFAVORABLE/EXCLU"
+  },
+  "mocked_api_note": "No mocked APIs - DVF uses real Cerema API with fallback to hardcoded data"
+}

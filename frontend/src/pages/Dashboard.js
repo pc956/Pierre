@@ -7,7 +7,7 @@ import {
   ChevronDown, TrendingUp, AlertTriangle, CheckCircle, XCircle,
   Layers, Eye, EyeOff, ExternalLink, X, Loader, Menu, FileDown
 } from 'lucide-react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents, Marker, Polyline, Polygon as LeafletPolygon } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents, Marker, Polyline, Polygon as LeafletPolygon, WMSTileLayer } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import ChatBot from '../components/ChatBot';
@@ -205,6 +205,11 @@ export default function Dashboard() {
     submarine_cables: true,
     dc_existants: true,
     rte_future_400kv: true,
+    zones_industrielles: false,
+    zones_inondables: false,
+    heatmap_mw: false,
+    cours_eau: false,
+    fond_routier: false,
   });
   
   // SIREN modal
@@ -219,6 +224,7 @@ export default function Dashboard() {
   const bboxTimerRef = useRef(null);
   const MIN_ZOOM_FOR_PARCELS = 14;
   const [flyTrigger, setFlyTrigger] = useState(0);
+  const [gpuZones, setGpuZones] = useState([]);
 
   // Load parcels dynamically from viewport BBox
   const loadBboxParcels = useCallback(async (bounds) => {
@@ -248,8 +254,14 @@ export default function Dashboard() {
     if (bboxTimerRef.current) clearTimeout(bboxTimerRef.current);
     bboxTimerRef.current = setTimeout(() => {
       loadBboxParcels(bounds);
+      // Load GPU industrial zones when layer active and zoom >= 12
+      if (layers.zones_industrielles && bounds.zoom >= 12) {
+        axios.get(`${API}/france/gpu-zones?min_lon=${bounds.min_lon}&min_lat=${bounds.min_lat}&max_lon=${bounds.max_lon}&max_lat=${bounds.max_lat}`)
+          .then(res => setGpuZones(res.data.zones || []))
+          .catch(() => {});
+      }
     }, 600);
-  }, [loadBboxParcels]);
+  }, [loadBboxParcels, layers.zones_industrielles]);
 
   // Fetch map layers data (infrastructure)
   useEffect(() => {
@@ -704,6 +716,79 @@ export default function Dashboard() {
                         </Popup>
                       </Marker>
                     ))}
+
+                    {/* Zones industrielles GPU */}
+                    {layers.zones_industrielles && gpuZones.map((zone, idx) => {
+                      const positions = geoJsonToPositions(zone.geometry);
+                      if (!positions.length) return null;
+                      return (
+                        <LeafletPolygon
+                          key={`gpu-zone-${idx}`}
+                          positions={positions}
+                          pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.15, weight: 1 }}
+                        >
+                          <Popup>
+                            <div className="text-xs">
+                              <b>{zone.properties?.typezone}</b> — {zone.properties?.libelle || 'Zone activités'}
+                            </div>
+                          </Popup>
+                        </LeafletPolygon>
+                      );
+                    })}
+
+                    {/* Heatmap MW S3REnR */}
+                    {layers.heatmap_mw && postes.map((poste, idx) => {
+                      const s3renr = poste.s3renr || {};
+                      const etat = s3renr.etat || 'inconnu';
+                      const mw = s3renr.mw_dispo || 0;
+                      let color = '#ffa502';
+                      let opacity = 0.08;
+                      if (etat === 'disponible' && mw > 50) { color = '#2ed573'; opacity = 0.12; }
+                      else if (etat === 'disponible') { color = '#2ed573'; opacity = 0.08; }
+                      else if (etat === 'sature') { color = '#ff4757'; opacity = 0.15; }
+                      else if (etat === 'contraint') { color = '#ffa502'; opacity = 0.10; }
+                      return (
+                        <CircleMarker
+                          key={`heatmap-${idx}`}
+                          center={[poste.geometry.coordinates[1], poste.geometry.coordinates[0]]}
+                          radius={40}
+                          pathOptions={{ color, fillColor: color, fillOpacity: opacity, weight: 0.5 }}
+                        />
+                      );
+                    })}
+
+                    {/* Zones inondables */}
+                    {layers.zones_inondables && filteredParcels.filter(p => p.ppri_zone).map(p => (
+                      <CircleMarker
+                        key={`flood-${p.parcel_id}`}
+                        center={[p.latitude, p.longitude]}
+                        radius={20}
+                        pathOptions={{ color: '#ff4757', fillColor: '#ff4757', fillOpacity: 0.2, weight: 1, dashArray: '4' }}
+                      >
+                        <Popup><span className="text-xs text-red-400">Zone inondable (PPRI)</span></Popup>
+                      </CircleMarker>
+                    ))}
+
+                    {/* Cours d'eau WMS */}
+                    {layers.cours_eau && (
+                      <WMSTileLayer
+                        url="https://data.geopf.fr/wms-r"
+                        layers="HYDROGRAPHY.HYDROGRAPHY"
+                        format="image/png"
+                        transparent={true}
+                        opacity={0.5}
+                        attribution="IGN"
+                      />
+                    )}
+
+                    {/* Fond routier */}
+                    {layers.fond_routier && (
+                      <TileLayer
+                        url="https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png"
+                        opacity={0.4}
+                        attribution="OpenStreetMap HOT"
+                      />
+                    )}
                     
                     {/* Parcels - rendered as cadastral polygons */}
                     {layers.parcels && filteredParcels.map(parcel => {
@@ -885,6 +970,14 @@ export default function Dashboard() {
                         active={layers.rte_future_400kv} 
                         onClick={() => toggleLayer('rte_future_400kv')} 
                       />
+                      <div className="mt-2 pt-2" style={{ borderTop: '1px solid #1f1f2e' }}>
+                        <div className="text-[10px] text-[#8f8f9d] uppercase mb-1">Environnement</div>
+                      </div>
+                      <LayerToggle label="Zones industrielles" color="#3b82f6" icon="▬" active={layers.zones_industrielles} onClick={() => toggleLayer('zones_industrielles')} />
+                      <LayerToggle label="Heatmap MW dispo" color="#2ed573" icon="◉" active={layers.heatmap_mw} onClick={() => toggleLayer('heatmap_mw')} />
+                      <LayerToggle label="Zones inondables" color="#ff4757" icon="◌" active={layers.zones_inondables} onClick={() => toggleLayer('zones_inondables')} />
+                      <LayerToggle label="Cours d'eau" color="#0ea5e9" icon="〰" active={layers.cours_eau} onClick={() => toggleLayer('cours_eau')} />
+                      <LayerToggle label="Réseau routier" color="#a78bfa" icon="═" active={layers.fond_routier} onClick={() => toggleLayer('fond_routier')} />
                     </div>
                   )}
                 </div>
@@ -1049,6 +1142,11 @@ export default function Dashboard() {
             <LayerToggle label="Câbles sous-marins" color="#00d4aa" icon="〰" active={layers.submarine_cables} onClick={() => toggleLayer('submarine_cables')} />
             <LayerToggle label="DC existants" color="#8b5cf6" icon="■" active={layers.dc_existants} onClick={() => toggleLayer('dc_existants')} />
             <LayerToggle label="400kV Future" color="#ff0040" icon="⚡" active={layers.rte_future_400kv} onClick={() => toggleLayer('rte_future_400kv')} />
+            <LayerToggle label="Zones indus." color="#3b82f6" icon="▬" active={layers.zones_industrielles} onClick={() => toggleLayer('zones_industrielles')} />
+            <LayerToggle label="Heatmap MW" color="#2ed573" icon="◉" active={layers.heatmap_mw} onClick={() => toggleLayer('heatmap_mw')} />
+            <LayerToggle label="Inondables" color="#ff4757" icon="◌" active={layers.zones_inondables} onClick={() => toggleLayer('zones_inondables')} />
+            <LayerToggle label="Cours d'eau" color="#0ea5e9" icon="〰" active={layers.cours_eau} onClick={() => toggleLayer('cours_eau')} />
+            <LayerToggle label="Routes" color="#a78bfa" icon="═" active={layers.fond_routier} onClick={() => toggleLayer('fond_routier')} />
           </div>
         </div>
       )}

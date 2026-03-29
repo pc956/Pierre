@@ -20,7 +20,7 @@ from api_carto import (
 from france_infra_data import get_all_france_infra
 from rte_future_line import distance_to_future_line, get_buffer_zone, score_future_400kv
 from scoring import compute_score_simple
-from dvf_data import get_dvf_for_commune
+from dvf_data import get_real_dvf_price
 from plu_scoring import score_plu, score_plu_dynamic
 from fibre_data import estimate_fibre
 from georisques import enrich_georisques
@@ -260,15 +260,12 @@ async def _enrich_parcel(parsed: dict, infra: dict, params: dict) -> dict:
         parsed["zone_sismique"] = risques.get("zone_sismique", 1)
         parsed["argiles_alea"] = risques.get("argiles_alea", "faible")
 
-    # ── DVF réel (Étape 2E) ──
+    # ── DVF réel (Étape 2E — API Cerema avec fallback) ──
     code_dep = parsed.get("departement", "")
-    if code_commune:
-        dvf = get_dvf_for_commune(code_commune)
-    elif code_dep:
-        dvf = get_dvf_for_commune(code_dep + "000")
-    else:
-        dvf = {}
-    parsed["dvf_prix_median_m2"] = dvf.get("prix_median_m2", 0)
+    dvf_result = await get_real_dvf_price(code_commune, code_dep, region)
+    parsed["dvf_prix_median_m2"] = dvf_result.get("prix_median_m2", 0)
+    parsed["dvf_source"] = dvf_result.get("source", "inconnu")
+    parsed["dvf_nb_transactions"] = dvf_result.get("nb_transactions", 0)
 
     # ── PLU via GPU (avec cache — Étape 4B) ──
     try:
@@ -481,6 +478,7 @@ async def _find_real_parcels(params: dict) -> dict:
             "plu_libelle": p.get("plu_libelle", ""),
             "plu_scoring": p.get("plu_scoring"),
             "dvf_prix_median_m2": p.get("dvf_prix_median_m2", 0),
+            "dvf_source": p.get("dvf_source", "inconnu"),
             "ppri_zone": p.get("ppri_zone"),
             "zone_sismique": p.get("zone_sismique", 1),
             "dist_future_400kv_m": p.get("dist_future_400kv_m", 0),
