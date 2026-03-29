@@ -9,11 +9,10 @@ Plateforme de prospection foncière pour data centers en France. Backend FastAPI
 - **Auth**: Google OAuth via Emergent Auth
 - **LLM**: GPT-4.1-mini via Emergent LLM Key
 - **APIs externes**: IGN Carto (cadastre), GPU (urbanisme/PLU/prescriptions/infos)
-- **PDF**: ReportLab
 
 ## Fonctionnalités implémentées
 
-### Phase 1-4 — MVP complet
+### Phase 1-4 — MVP
 - [x] Carte + infra + S3REnR + mobile + PLU + API DC + chatbot + DVF + PDF
 
 ### Phase 5 — Future ligne 400kV
@@ -21,28 +20,20 @@ Plateforme de prospection foncière pour data centers en France. Backend FastAPI
 
 ### Phase 6-7 — Chatbot parcelles + Filtres + Optim N+1
 - [x] Recherche parcelles cadastrales réelles + filtres avancés
+- [x] Auto-expansion rayon de recherche selon critères (HTB distance, surface min)
 
-### Phase 8 — Scoring PLU statique DC
-- [x] Score 0-100 par zone + ajustements + parser mots-clés
-
-### Phase 9 — Scoring PLU dynamique GPU
-- [x] Fetch parallèle zone-urba + prescription-surf + info-surf
-- [x] Analyse prescriptions (EBC, patrimoine), informations (PPRT, ZAC), destination dominante
-
-### Phase 10 — Score PLU composite + Indicateur de confiance (29/03/2026)
-- [x] Composite : dynamique GPU (priorité) → fallback statique
-- [x] Confidence levels : haute (GPU + prescriptions/infos), moyenne (statique + règlement), basse (code seul)
-- [x] confidence_detail expliquant les sources utilisées
-- [x] Frontend : indicateur 3 points colorés (vert=haute, orange=moyenne, rouge=basse)
-- [x] Intégré dans bbox parcelles, chatbot, fiche parcelle
+### Phase 8-10 — Scoring PLU complet
+- [x] Statique (code zone) + Dynamique GPU (prescriptions + infos + destination)
+- [x] Indicateur de confiance (haute/moyenne/basse)
+- [x] Composite : dynamique prioritaire → fallback statique
 
 ## Endpoints API
 | Endpoint | Méthode | Description |
 |----------|---------|-------------|
-| `/api/scoring/plu-dynamic` | GET | Score PLU dynamique GPU (lon, lat) |
+| `/api/scoring/plu-dynamic` | GET | Score PLU dynamique GPU |
 | `/api/scoring/plu/{zone}` | GET | Score PLU statique |
 | `/api/scoring/plu` | POST | Score PLU avec ajustements |
-| `/api/chat` | POST | Chatbot IA |
+| `/api/chat` | POST | Chatbot IA (parcelles + scoring dynamique) |
 | `/api/dc/search` | POST | Recherche DC |
 | `/api/map/rte-future-400kv` | GET | Future 400kV |
 | `/api/export/pdf/{id}` | GET | Export PDF |

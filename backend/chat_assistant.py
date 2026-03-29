@@ -136,10 +136,6 @@ async def _find_real_parcels(params: dict) -> dict:
     }
     
     dc_results = dc_search(search_params)
-    top_sites = dc_results.get("results", [])[:3]
-    
-    if not top_sites:
-        return {"parcels": [], "sites_searched": 0, "message": "Aucun poste HTB correspondant trouvé."}
     
     search_radius = min(params.get("search_radius_m", 2000), 5000)
     min_surface_ha = params.get("min_surface_ha", 1.0)
@@ -149,6 +145,20 @@ async def _find_real_parcels(params: dict) -> dict:
     max_dist_htb_m = params.get("max_dist_htb_km", 5) * 1000
     min_tension_kv = params.get("min_tension_kv")
     max_dist_future_line_m = (params.get("max_dist_future_line_km") or 0) * 1000 if params.get("max_dist_future_line_km") else None
+    
+    # Search more sites when criteria are strict
+    n_sites = 5 if min_surface_ha >= 3 or plu_zones else 3
+    top_sites = dc_results.get("results", [])[:n_sites]
+    
+    if not top_sites:
+        return {"parcels": [], "sites_searched": 0, "message": "Aucun poste HTB correspondant trouvé."}
+    
+    # Auto-expand search radius to cover max_dist_htb + margin
+    effective_radius = max(search_radius, int(max_dist_htb_m * 1.2), 2500)
+    # If large parcels needed, expand further
+    if min_surface_ha >= 3:
+        effective_radius = max(effective_radius, 4000)
+    effective_radius = min(effective_radius, 5000)  # Cap at 5km
     
     all_parcels = []
     sites_searched = []
@@ -160,7 +170,7 @@ async def _find_real_parcels(params: dict) -> dict:
         site_score = site["score"]["global"]
         
         try:
-            data = await get_parcelles_around_point(lng, lat, radius_m=search_radius, limit=80)
+            data = await get_parcelles_around_point(lng, lat, radius_m=effective_radius, limit=120)
             features = data.get("features", [])
         except Exception as e:
             logger.warning(f"IGN API error for {site_name}: {e}")
@@ -352,7 +362,7 @@ async def _find_real_parcels(params: dict) -> dict:
             "min_tension_kv": min_tension_kv,
             "max_dist_future_line_km": params.get("max_dist_future_line_km"),
             "plu_zones": plu_zones,
-            "search_radius_m": search_radius,
+            "search_radius_m": effective_radius,
         },
     }
 
