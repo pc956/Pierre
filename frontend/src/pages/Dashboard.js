@@ -3,10 +3,9 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { 
-  Server, Map as MapIcon, Table, Bell, Settings, LogOut, 
-  Search, Filter, ChevronDown, ChevronUp, Plus, Zap, Wifi, Droplets, Square,
-  TrendingUp, Clock, AlertTriangle, CheckCircle, XCircle, RefreshCw,
-  Layers, Eye, EyeOff, Anchor, Cable, Building2, ExternalLink, X, Loader, Menu, FileDown
+  Server, Map as MapIcon, Table, Bell, LogOut, 
+  ChevronDown, TrendingUp, AlertTriangle, CheckCircle, XCircle,
+  Layers, Eye, EyeOff, ExternalLink, X, Loader, Menu, FileDown
 } from 'lucide-react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents, Marker, Polyline, Polygon as LeafletPolygon } from 'react-leaflet';
 import L from 'leaflet';
@@ -171,7 +170,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState(null);
   const [projectType, setProjectType] = useState('colocation_t3');
-  const [scoreMin, setScoreMin] = useState(0);
   
   // Mobile state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -205,10 +203,7 @@ export default function Dashboard() {
   // SIREN modal
   const [sirenModal, setSirenModal] = useState(null);
   
-  // Commune search (API Carto)
-  const [communeSearch, setCommuneSearch] = useState('');
-  const [communeResults, setCommuneResults] = useState([]);
-  const [searchLoading, setSearchLoading] = useState(false);
+  // Parcels loaded via map or AI
   const [franceParcels, setFranceParcels] = useState([]);
   
   // Viewport-based dynamic loading
@@ -217,91 +212,6 @@ export default function Dashboard() {
   const bboxTimerRef = useRef(null);
   const MIN_ZOOM_FOR_PARCELS = 14;
   const [flyTrigger, setFlyTrigger] = useState(0);
-  
-  // Advanced filters
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [filters, setFilters] = useState({
-    distPosteMax: 100, // km - permissive default
-    distLandingMax: 1000, // km - permissive default
-    surfaceMin: 0, // ha
-    surfaceMax: 500, // ha
-    pluZones: [], // empty = all
-  });
-  
-  // Available PLU zones
-  const PLU_OPTIONS = [
-    { value: 'I', label: 'I - Zone industrielle' },
-    { value: 'IX', label: 'IX - Industrielle étendue' },
-    { value: 'UX', label: 'UX - Urbaine activités' },
-    { value: 'UI', label: 'UI - Urbaine industrielle' },
-    { value: 'UE', label: 'UE - Urbaine économique' },
-    { value: 'AUX', label: 'AUX - À urbaniser activités' },
-    { value: 'AU', label: 'AU - À urbaniser' },
-    { value: '1AU', label: '1AU - AU ouvert' },
-    { value: '2AU', label: '2AU - AU fermé' },
-    { value: 'U', label: 'U - Zone urbaine' },
-  ];
-
-  // Search communes in France
-  const searchCommunes = async (query) => {
-    if (query.length < 2) {
-      setCommuneResults([]);
-      return;
-    }
-    setSearchLoading(true);
-    try {
-      const response = await axios.get(`${API}/france/communes?q=${encodeURIComponent(query)}&limit=10`);
-      setCommuneResults(response.data.communes || []);
-    } catch (error) {
-      console.error('Error searching communes:', error);
-    } finally {
-      setSearchLoading(false);
-    }
-  };
-
-  // Load parcels for a commune
-  const loadCommuneParcels = async (commune) => {
-    setSearchLoading(true);
-    try {
-      const response = await axios.get(
-        `${API}/france/parcelles/commune/${commune.code}?project_type=${projectType}`
-      );
-      const newParcels = response.data.parcelles || [];
-      setFranceParcels(prev => {
-        const existing = new Set(prev.map(p => p.parcel_id));
-        const unique = newParcels.filter(p => !existing.has(p.parcel_id));
-        return [...prev, ...unique];
-      });
-      setFlyTrigger(t => t + 1);
-      setCommuneSearch('');
-      setCommuneResults([]);
-    } catch (error) {
-      console.error('Error loading commune parcels:', error);
-    } finally {
-      setSearchLoading(false);
-    }
-  };
-
-  // Load parcels around a point (poste HTB or landing point)
-  const loadParcelsAroundPoint = async (lon, lat, radius = 2000, name = '') => {
-    setSearchLoading(true);
-    try {
-      const response = await axios.get(
-        `${API}/france/parcelles/around?lon=${lon}&lat=${lat}&radius_m=${radius}&project_type=${projectType}`
-      );
-      const newParcels = response.data.parcelles || [];
-      setFranceParcels(prev => {
-        const existing = new Set(prev.map(p => p.parcel_id));
-        const unique = newParcels.filter(p => !existing.has(p.parcel_id));
-        return [...prev, ...unique];
-      });
-      setFlyTrigger(t => t + 1);
-    } catch (error) {
-      console.error('Error loading parcels around point:', error);
-    } finally {
-      setSearchLoading(false);
-    }
-  };
 
   // Load parcels dynamically from viewport BBox
   const loadBboxParcels = useCallback(async (bounds) => {
@@ -357,32 +267,8 @@ export default function Dashboard() {
   const allParcels = franceParcels;
   
   // Apply advanced filters client-side
-  const filteredParcels = allParcels.filter(p => {
-    // Distance poste HTB - only filter if value is known
-    if (p.dist_poste_htb_m && p.dist_poste_htb_m > 0) {
-      const distPoste = p.dist_poste_htb_m / 1000;
-      if (distPoste > filters.distPosteMax) return false;
-    }
-    
-    // Distance landing point - only filter if value is known
-    if (p.dist_landing_point_km && p.dist_landing_point_km > 0) {
-      if (p.dist_landing_point_km > filters.distLandingMax) return false;
-    }
-    
-    // Surface
-    const surface = p.surface_ha || 0;
-    if (surface < filters.surfaceMin) return false;
-    if (filters.surfaceMax > 0 && surface > filters.surfaceMax) return false;
-    
-    // Score min
-    const score = p.score?.score_net || 0;
-    if (scoreMin > 0 && score < scoreMin) return false;
-    
-    // PLU zones
-    if (filters.pluZones.length > 0 && !filters.pluZones.includes(p.plu_zone)) return false;
-    
-    return true;
-  });
+  // All parcels displayed — filtering done via AI chatbot
+  const filteredParcels = allParcels;
 
   const fetchMapLayers = async () => {
     try {
@@ -454,16 +340,6 @@ export default function Dashboard() {
                   <MapIcon size={14} />
                   Carte
                 </button>
-                <button
-                  onClick={() => setActiveView('table')}
-                  className={`h-8 px-3 flex items-center gap-2 text-xs font-mono uppercase transition-colors ${
-                    activeView === 'table' ? 'text-[#00d4aa] border-b-2 border-[#00d4aa]' : 'text-[#8f8f9d] hover:text-[#e8e8ed]'
-                  }`}
-                  data-testid="nav-table"
-                >
-                  <Table size={14} />
-                  Tableau
-                </button>
             </nav>
             )}
           </div>
@@ -501,111 +377,24 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Filters bar - desktop: inline, mobile: hidden behind button */}
+        {/* Status bar - desktop */}
         {!isMobile && (
           <div 
-            className="h-12 flex items-center gap-4 px-4 shrink-0"
+            className="h-10 flex items-center gap-4 px-4 shrink-0"
             style={{ background: '#0a0a0f', borderBottom: '1px solid #1f1f2e' }}
           >
-          {/* France Search */}
-          <div className="relative flex items-center gap-2">
-            <Search size={14} style={{ color: '#3b82f6' }} />
-            <input
-              type="text"
-              value={communeSearch}
-              onChange={(e) => {
-                setCommuneSearch(e.target.value);
-                searchCommunes(e.target.value);
-              }}
-              placeholder="Rechercher une commune..."
-              className="h-7 px-2 text-xs"
-              style={{ width: 200 }}
-              data-testid="commune-search"
-            />
-            {searchLoading && <div className="loader" style={{ width: 14, height: 14 }}></div>}
-            
-            {/* Dropdown results */}
-            {communeResults.length > 0 && (
-              <div 
-                className="absolute top-full left-0 mt-1 z-50 w-80"
-                style={{ background: '#12121a', border: '1px solid #1f1f2e' }}
-              >
-                {communeResults.map(commune => (
-                  <button
-                    key={commune.code}
-                    onClick={() => loadCommuneParcels(commune)}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-[#1f1f2e] flex justify-between"
-                    style={{ color: '#e8e8ed' }}
-                  >
-                    <span>
-                      <strong>{commune.nom}</strong>
-                      <span style={{ color: '#8f8f9d' }}> ({commune.departement?.code})</span>
-                    </span>
-                    <span className="font-mono" style={{ color: '#8f8f9d' }}>
-                      {commune.population?.toLocaleString()} hab
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Type projet:</label>
-            <select
-              value={projectType}
-              onChange={(e) => setProjectType(e.target.value)}
-              className="h-7 px-2 text-xs"
-              style={{ minWidth: 140 }}
-              data-testid="project-type-select"
-            >
-              {PROJECT_TYPES.map(pt => (
-                <option key={pt.value} value={pt.value}>{pt.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Score min:</label>
-            <input
-              type="range"
-              min="0"
-              max="90"
-              step="10"
-              value={scoreMin}
-              onChange={(e) => setScoreMin(parseInt(e.target.value))}
-              className="w-24"
-            />
-            <span className="text-xs font-mono" style={{ color: '#00d4aa' }}>{scoreMin}</span>
-          </div>
-
-          <button
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className={`h-8 px-3 flex items-center gap-1 text-xs font-mono uppercase border transition-colors ${
-              showAdvancedFilters ? 'border-[#00d4aa] text-[#00d4aa]' : 'border-[#1f1f2e] text-[#8f8f9d]'
-            }`}
-            data-testid="advanced-filters-btn"
-          >
-            <Filter size={12} />
-            Filtres avancés
-            {(filters.pluZones.length > 0 || filters.distPosteMax < 100 || filters.distLandingMax < 1000 || filters.surfaceMin > 0) && (
-              <span className="ml-1 w-2 h-2 rounded-full" style={{ background: '#00d4aa' }}></span>
-            )}
-          </button>
-
-          <div className="ml-auto flex items-center gap-4">
-            {bboxLoading && (
-              <span className="flex items-center gap-1 text-xs" style={{ color: '#3b82f6' }}>
-                <Loader size={12} className="animate-spin" />
-                Chargement parcelles...
-              </span>
-            )}
             <span className="text-xs font-mono" style={{ color: '#8f8f9d' }} data-testid="status-bar">
               {filteredParcels.length} sites
               {mapZoom < MIN_ZOOM_FOR_PARCELS && ' · Zoomez (z≥14) pour voir les parcelles'}
               {mapZoom >= MIN_ZOOM_FOR_PARCELS && ` · z${mapZoom}`}
               {' · '}{postes.length} postes · {dcExistants.length} DC · {landingPoints.length} LP
             </span>
+            {bboxLoading && (
+              <span className="flex items-center gap-1 text-xs" style={{ color: '#3b82f6' }}>
+                <Loader size={12} className="animate-spin" />
+                Chargement parcelles...
+              </span>
+            )}
             {franceParcels.length > 0 && (
               <button
                 onClick={() => setFranceParcels([])}
@@ -618,7 +407,6 @@ export default function Dashboard() {
               </button>
             )}
           </div>
-        </div>
         )}
 
         {/* Mobile top controls */}
@@ -627,192 +415,16 @@ export default function Dashboard() {
             className="flex items-center gap-2 px-3 py-2 shrink-0"
             style={{ background: '#0a0a0f', borderBottom: '1px solid #1f1f2e' }}
           >
-            {/* Search */}
-            <div className="relative flex-1 flex items-center gap-1">
-              <Search size={12} style={{ color: '#3b82f6' }} />
-              <input
-                type="text"
-                value={communeSearch}
-                onChange={(e) => {
-                  setCommuneSearch(e.target.value);
-                  searchCommunes(e.target.value);
-                }}
-                placeholder="Commune..."
-                className="h-7 px-2 text-xs flex-1"
-                data-testid="commune-search-mobile"
-              />
-              {searchLoading && <div className="loader" style={{ width: 12, height: 12 }}></div>}
-              {communeResults.length > 0 && (
-                <div 
-                  className="absolute top-full left-0 mt-1 z-50 w-full"
-                  style={{ background: '#12121a', border: '1px solid #1f1f2e' }}
-                >
-                  {communeResults.map(commune => (
-                    <button
-                      key={commune.code}
-                      onClick={() => loadCommuneParcels(commune)}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-[#1f1f2e]"
-                      style={{ color: '#e8e8ed' }}
-                    >
-                      <strong>{commune.nom}</strong>
-                      <span style={{ color: '#8f8f9d' }}> ({commune.departement?.code})</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            
-            {/* Mobile action buttons */}
-            <button
-              onClick={() => setMobilePanel(mobilePanel === 'filters' ? null : 'filters')}
-              className={`h-8 w-8 flex items-center justify-center rounded ${mobilePanel === 'filters' ? 'bg-[#00d4aa22] text-[#00d4aa]' : 'text-[#8f8f9d]'}`}
-              data-testid="mobile-filters-btn"
-            >
-              <Filter size={16} />
-            </button>
+            <span className="text-[10px] font-mono flex-1" style={{ color: '#8f8f9d' }}>
+              {filteredParcels.length} sites
+              {bboxLoading && <Loader size={10} className="inline ml-1 animate-spin" />}
+            </span>
             <button
               onClick={() => setMobilePanel(mobilePanel === 'layers' ? null : 'layers')}
               className={`h-8 w-8 flex items-center justify-center rounded ${mobilePanel === 'layers' ? 'bg-[#00d4aa22] text-[#00d4aa]' : 'text-[#8f8f9d]'}`}
               data-testid="mobile-layers-btn"
             >
               <Layers size={16} />
-            </button>
-            
-            {/* Status */}
-            <span className="text-[10px] font-mono whitespace-nowrap" style={{ color: '#8f8f9d' }}>
-              {filteredParcels.length}
-              {bboxLoading && <Loader size={10} className="inline ml-1 animate-spin" />}
-            </span>
-          </div>
-        )}
-        {(showAdvancedFilters || (isMobile && mobilePanel === 'filters')) && (
-          <div 
-            className={`px-3 md:px-4 py-3 flex flex-wrap items-center gap-3 md:gap-6 shrink-0 ${isMobile ? 'fixed bottom-0 left-0 right-0 z-40 flex-col items-stretch' : ''}`}
-            style={{ background: '#12121a', borderTop: isMobile ? '1px solid #1f1f2e' : 'none', borderBottom: isMobile ? 'none' : '1px solid #1f1f2e', maxHeight: isMobile ? '60vh' : 'auto', overflowY: isMobile ? 'auto' : 'visible' }}
-          >
-            {isMobile && (
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-mono uppercase" style={{ color: '#00d4aa' }}>Filtres avancés</span>
-                <button onClick={() => setMobilePanel(null)} className="text-[#8f8f9d]"><X size={16} /></button>
-              </div>
-            )}
-            {/* Type projet (mobile only - desktop has it in filter bar) */}
-            {isMobile && (
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Type projet:</label>
-                <select
-                  value={projectType}
-                  onChange={(e) => setProjectType(e.target.value)}
-                  className="h-7 px-2 text-xs flex-1"
-                  data-testid="project-type-select-mobile"
-                >
-                  {PROJECT_TYPES.map(pt => (
-                    <option key={pt.value} value={pt.value}>{pt.label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {/* Distance Poste HTB */}
-            <div className="flex items-center gap-2">
-              <Zap size={14} style={{ color: '#ffa502' }} />
-              <label className="text-xs" style={{ color: '#8f8f9d' }}>Dist. poste RTE max:</label>
-              <input
-                type="number"
-                min="1"
-                max="200"
-                value={filters.distPosteMax}
-                onChange={(e) => setFilters(f => ({ ...f, distPosteMax: parseInt(e.target.value) || 100 }))}
-                className="w-16 h-7 px-2 text-xs text-center"
-              />
-              <span className="text-xs" style={{ color: '#8f8f9d' }}>km</span>
-            </div>
-
-            {/* Distance Landing Point */}
-            <div className="flex items-center gap-2">
-              <Anchor size={14} style={{ color: '#00d4aa' }} />
-              <label className="text-xs" style={{ color: '#8f8f9d' }}>Dist. landing point max:</label>
-              <input
-                type="number"
-                min="10"
-                max="1000"
-                step="10"
-                value={filters.distLandingMax}
-                onChange={(e) => setFilters(f => ({ ...f, distLandingMax: parseInt(e.target.value) || 500 }))}
-                className="w-20 h-7 px-2 text-xs text-center"
-              />
-              <span className="text-xs" style={{ color: '#8f8f9d' }}>km</span>
-            </div>
-
-            {/* Surface */}
-            <div className="flex items-center gap-2">
-              <Square size={14} style={{ color: '#3b82f6' }} />
-              <label className="text-xs" style={{ color: '#8f8f9d' }}>Surface:</label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.5"
-                value={filters.surfaceMin}
-                onChange={(e) => setFilters(f => ({ ...f, surfaceMin: parseFloat(e.target.value) || 0 }))}
-                className="w-16 h-7 px-2 text-xs text-center"
-                placeholder="Min"
-              />
-              <span className="text-xs" style={{ color: '#8f8f9d' }}>-</span>
-              <input
-                type="number"
-                min="0"
-                max="200"
-                step="1"
-                value={filters.surfaceMax}
-                onChange={(e) => setFilters(f => ({ ...f, surfaceMax: parseFloat(e.target.value) || 100 }))}
-                className="w-16 h-7 px-2 text-xs text-center"
-                placeholder="Max"
-              />
-              <span className="text-xs" style={{ color: '#8f8f9d' }}>ha</span>
-            </div>
-
-            {/* PLU Zones */}
-            <div className="flex items-center gap-2">
-              <MapIcon size={14} style={{ color: '#8b5cf6' }} />
-              <label className="text-xs" style={{ color: '#8f8f9d' }}>Zones PLU:</label>
-              <div className="relative">
-                <select
-                  multiple
-                  value={filters.pluZones}
-                  onChange={(e) => {
-                    const selected = Array.from(e.target.selectedOptions, opt => opt.value);
-                    setFilters(f => ({ ...f, pluZones: selected }));
-                  }}
-                  className="h-7 px-2 text-xs"
-                  style={{ minWidth: 180 }}
-                  data-testid="plu-filter"
-                >
-                  {PLU_OPTIONS.map(plu => (
-                    <option key={plu.value} value={plu.value}>{plu.label}</option>
-                  ))}
-                </select>
-              </div>
-              {filters.pluZones.length > 0 && (
-                <span className="text-xs font-mono" style={{ color: '#00d4aa' }}>
-                  {filters.pluZones.length} sélectionné(s)
-                </span>
-              )}
-            </div>
-
-            {/* Reset button */}
-            <button
-              onClick={() => setFilters({
-                distPosteMax: 100,
-                distLandingMax: 1000,
-                surfaceMin: 0,
-                surfaceMax: 500,
-                pluZones: [],
-              })}
-              className="text-xs flex items-center gap-1 hover:text-[#ff4757]"
-              style={{ color: '#8f8f9d' }}
-            >
-              <XCircle size={12} />
-              Réinitialiser
             </button>
           </div>
         )}
@@ -1400,11 +1012,6 @@ export default function Dashboard() {
             </>
           )}
 
-          {activeView === 'table' && (
-            <div className="flex-1 overflow-auto p-4">
-              <ParcelsTable parcels={filteredParcels} projectType={projectType} onSelect={handleParcelClick} />
-            </div>
-          )}
         </div>
       </div>
 
