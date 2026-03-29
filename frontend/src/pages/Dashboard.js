@@ -2038,6 +2038,36 @@ function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
                   )}
                 </div>
               )}
+              
+              {/* Confidence indicator */}
+              {parcel.plu_scoring.confidence && (
+                <div className="flex items-center justify-between text-[10px] mt-2 pt-2" style={{ borderTop: '1px solid #1f1f2e' }} data-testid="plu-confidence">
+                  <span style={{ color: '#8f8f9d' }}>Fiabilité</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="w-2 h-2 rounded-full" style={{ 
+                          background: parcel.plu_scoring.confidence === 'haute' ? (i <= 3 ? '#2ed573' : '#1f1f2e')
+                                    : parcel.plu_scoring.confidence === 'moyenne' ? (i <= 2 ? '#ffa502' : '#1f1f2e')
+                                    : (i <= 1 ? '#ff4757' : '#1f1f2e'),
+                        }} />
+                      ))}
+                    </div>
+                    <span className="font-mono" style={{ 
+                      color: parcel.plu_scoring.confidence === 'haute' ? '#2ed573' 
+                           : parcel.plu_scoring.confidence === 'moyenne' ? '#ffa502' 
+                           : '#ff4757' 
+                    }}>
+                      {parcel.plu_scoring.confidence}
+                    </span>
+                  </div>
+                </div>
+              )}
+              {parcel.plu_scoring.confidence_detail && (
+                <p className="text-[9px] mt-0.5" style={{ color: '#8f8f9d55' }}>
+                  {parcel.plu_scoring.confidence_detail}
+                </p>
+              )}
             </div>
           )}
           

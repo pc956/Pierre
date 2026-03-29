@@ -1175,17 +1175,32 @@ async def get_bbox_parcelles(
             parsed["plu_libelong"] = plu_libelong
             parsed["zone_saturation"] = "inconnu"
             
-            # PLU Scoring — Dynamic via GPU when data is available
-            if plu_zone and plu_zone != "inconnu":
-                plu_scoring_result = score_plu(
-                    zone_code=plu_zone,
-                    zone_label=plu_libelle,
-                    reglement_text=plu_libelong if plu_libelong else None,
-                )
-                plu_scoring_result["gpu_source"] = "static_from_zone"
-            else:
-                plu_scoring_result = score_plu(zone_code="inconnu")
-                plu_scoring_result["gpu_source"] = "fallback"
+            # PLU Scoring — Composite: try dynamic GPU first, fallback to static
+            try:
+                gpu_ctx = await get_gpu_full_context(plon, plat)
+                if gpu_ctx.get("zone"):
+                    plu_scoring_result = score_plu_dynamic(gpu_ctx)
+                    # Override zone info with GPU data if richer
+                    if gpu_ctx["zone"].get("typezone"):
+                        parsed["plu_zone"] = gpu_ctx["zone"]["typezone"]
+                    if gpu_ctx["zone"].get("libelle"):
+                        parsed["plu_libelle"] = gpu_ctx["zone"]["libelle"]
+                    if gpu_ctx["zone"].get("libelong"):
+                        parsed["plu_libelong"] = gpu_ctx["zone"]["libelong"]
+                else:
+                    raise ValueError("GPU zone unavailable")
+            except Exception:
+                # Fallback to static scoring
+                if plu_zone and plu_zone != "inconnu":
+                    plu_scoring_result = score_plu(
+                        zone_code=plu_zone,
+                        zone_label=plu_libelle,
+                        reglement_text=plu_libelong if plu_libelong else None,
+                    )
+                    plu_scoring_result["gpu_source"] = "static_from_zone"
+                else:
+                    plu_scoring_result = score_plu(zone_code="inconnu")
+                    plu_scoring_result["gpu_source"] = "fallback"
             parsed["plu_scoring"] = plu_scoring_result
             
             # Future 400kV line distance & scoring

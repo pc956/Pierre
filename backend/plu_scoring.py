@@ -378,15 +378,17 @@ def score_plu(
             "category": category,
             "adjustments": [],
             "keyword_analysis": None,
+            "confidence": "moyenne",
+            "confidence_detail": "Scoring statique par code zone uniquement",
         }
 
     # Residential exclusion
     if category == "residential":
         base_score_res = 15
-        # Check if reglement might allow some exceptions
         kw = parse_reglement_keywords(reglement_text) if reglement_text else None
         if kw and kw["net_signal"] >= 2:
-            base_score_res = 25  # Slight bump if reglement is favorable
+            base_score_res = 25
+        has_reglement = reglement_text is not None and len(reglement_text or "") > 10
         return {
             "plu_code": code,
             "plu_label": zone_label,
@@ -399,6 +401,8 @@ def score_plu(
             "category": category,
             "adjustments": [],
             "keyword_analysis": kw,
+            "confidence": "moyenne" if has_reglement else "basse",
+            "confidence_detail": "Scoring statique" + (" + analyse règlement" if has_reglement else " — pas de texte règlement"),
         }
 
     # Apply adjustments
@@ -420,6 +424,18 @@ def score_plu(
     risk = _get_risk_level(final_score, flags)
 
     kw_analysis = parse_reglement_keywords(reglement_text) if reglement_text else None
+    has_reglement = reglement_text is not None and len(reglement_text or "") > 10
+    has_adjustments = len([a for a in [is_brownfield, is_zac_zip_port, reglement_allows_equipment, urbanisation_conditionnee, proximite_habitat, contrainte_patrimoniale, risque_reglementaire_majeur] if a]) > 0
+
+    if has_adjustments and has_reglement:
+        conf = "haute"
+        conf_detail = "Scoring statique + ajustements contextuels + analyse règlement"
+    elif has_reglement:
+        conf = "moyenne"
+        conf_detail = "Scoring statique + analyse règlement"
+    else:
+        conf = "basse"
+        conf_detail = "Scoring statique par code zone uniquement"
 
     return {
         "plu_code": code,
@@ -433,6 +449,8 @@ def score_plu(
         "category": category,
         "adjustments": adjustments,
         "keyword_analysis": kw_analysis,
+        "confidence": conf,
+        "confidence_detail": conf_detail,
     }
 
 
@@ -714,6 +732,25 @@ def score_plu_dynamic(gpu_context: dict) -> dict:
             seen.add(f)
             unique_flags.append(f)
 
+    # Confidence level — dynamic is always higher than static
+    n_sources = 1  # zone itself
+    if len(prescriptions) > 0:
+        n_sources += 1
+    if len(informations) > 0:
+        n_sources += 1
+    if dest_analysis["industrial_signals"] + dest_analysis["residential_signals"] + dest_analysis["nature_signals"] > 0:
+        n_sources += 1
+
+    if n_sources >= 3:
+        conf = "haute"
+        conf_detail = f"GPU dynamique : zone + {len(prescriptions)} prescription(s) + {len(informations)} info(s) + analyse destination"
+    elif n_sources >= 2:
+        conf = "haute"
+        conf_detail = f"GPU dynamique : zone + {'prescriptions' if prescriptions else 'informations'}"
+    else:
+        conf = "moyenne"
+        conf_detail = "GPU dynamique : zone seule (pas de prescriptions/infos)"
+
     return {
         "plu_code": zone_code,
         "plu_label": libelong or base_result.get("plu_label", ""),
@@ -728,6 +765,8 @@ def score_plu_dynamic(gpu_context: dict) -> dict:
         "category": base_result.get("category", "unknown"),
         "adjustments": all_adjustments,
         "keyword_analysis": base_result.get("keyword_analysis"),
+        "confidence": conf,
+        "confidence_detail": conf_detail,
         "gpu_source": "dynamic",
         "gpu_data": {
             "zone_raw": zone,

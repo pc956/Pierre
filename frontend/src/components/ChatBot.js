@@ -438,8 +438,22 @@ function ChatMessage({ msg, onSiteClick, onParcelClick }) {
                       </span>
                     )}
                   </div>
-                  <div className="mt-1 text-[9px]" style={{ color: '#00d4aa88' }}>
-                    {p.score?.verdict} · {p.site_origin}
+                  <div className="mt-1 flex items-center gap-1 text-[9px]" style={{ color: '#00d4aa88' }}>
+                    <span>{p.score?.verdict} · {p.site_origin}</span>
+                    {p.plu_scoring?.confidence && (
+                      <span className="ml-auto flex items-center gap-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ 
+                          background: p.plu_scoring.confidence === 'haute' ? '#2ed573' 
+                                    : p.plu_scoring.confidence === 'moyenne' ? '#ffa502' : '#ff4757' 
+                        }} />
+                        <span style={{ 
+                          color: p.plu_scoring.confidence === 'haute' ? '#2ed573' 
+                               : p.plu_scoring.confidence === 'moyenne' ? '#ffa502' : '#ff4757' 
+                        }}>
+                          {p.plu_scoring.confidence}
+                        </span>
+                      </span>
+                    )}
                   </div>
                 </div>
               );

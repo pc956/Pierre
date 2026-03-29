@@ -1,0 +1,89 @@
+{
+  "summary": "Iteration 15 Testing Complete - PLU Composite Scoring with Confidence Indicator. All 15 backend tests passed. Dynamic GPU scoring returns confidence=haute with prescriptions/infos. Static scoring returns confidence=basse (code-only) or moyenne (with regulation text or excluded zones). Frontend shows 3-dot confidence indicator in ParcelDetail and chatbot parcel cards.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "=== DYNAMIC PLU CONFIDENCE (5/5) ===",
+    "GET /api/scoring/plu-dynamic?lon=4.94&lat=43.44 (Fos) returns confidence=haute with GPU dynamique detail",
+    "GET /api/scoring/plu-dynamic?lon=4.85&lat=45.74 (Lyon) returns confidence=haute with prescriptions/infos",
+    "Dynamic scoring returns gpu_source=dynamic",
+    "Unavailable location (ocean) returns gpu_source=unavailable with fallback",
+    "Confidence=haute requires multiple sources (zone + prescriptions/infos)",
+    "=== STATIC PLU CONFIDENCE (3/3) ===",
+    "GET /api/scoring/plu/UI returns confidence=basse (static code-only)",
+    "GET /api/scoring/plu/N returns confidence=moyenne (excluded zones)",
+    "POST /api/scoring/plu with reglement_text returns confidence=moyenne or haute",
+    "=== CHATBOT INTEGRATION (2/2) ===",
+    "POST /api/chat parcel search returns parcels with confidence in plu_scoring",
+    "Chatbot parcel cards show confidence dot indicator (green=haute, orange=moyenne, red=basse)",
+    "=== BBOX PARCELS (1/1) ===",
+    "GET /api/france/parcelles/bbox returns parcels with plu_scoring.confidence field",
+    "=== PREVIOUS FEATURES STILL WORK (4/4) ===",
+    "GET /api/map/electrical-assets returns 150+ assets with postes HTB",
+    "GET /api/map/rte-future-400kv returns line + buffers (1km, 3km, 5km)",
+    "POST /api/export/pdf generates valid PDF",
+    "GET /api/s3renr/summary returns regional capacity data",
+    "=== FRONTEND VERIFICATION ===",
+    "Dashboard loads with map, layers panel, S3REnR summary",
+    "Layer toggles work including 400kV Future Fos→Jonq.",
+    "Chatbot opens and processes parcel search queries",
+    "Chatbot parcel cards show confidence indicator with colored dot",
+    "ParcelDetail panel has data-testid='plu-confidence' with 3-dot indicator"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_plu_confidence_iteration15.py",
+    "/app/test_reports/pytest/pytest_results_confidence_iteration15.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_plu_confidence_iteration15.py"
+  ],
+  "success_rate": {
+    "backend": "100% (15/15 tests passed)",
+    "frontend": "100% (all confidence indicator features working)"
+  },
+  "test_credentials": "Cookie: session_token=test_session_token_2026",
+  "seed_data_creation": "No seed data needed - uses real GPU API (apicarto.ign.fr) for PLU data",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 15 tested the NEW Confidence Indicator feature for PLU scoring. Key findings: 1) Dynamic GPU scoring (via /api/scoring/plu-dynamic) returns confidence='haute' when prescriptions/infos are available. 2) Static scoring returns confidence='basse' for code-only or 'moyenne' for excluded zones or when reglement_text is provided. 3) confidence_detail explains why the level was assigned (e.g., 'GPU dynamique : zone + 2 prescription(s) + 3 info(s)'). 4) Frontend ParcelDetail shows 3-dot indicator: green filled = haute, 2 orange = moyenne, 1 red = basse. 5) Chatbot parcel cards show confidence dot next to verdict. 6) Bbox parcels endpoint tries dynamic GPU first, falls back to static gracefully.",
+  "feature_verification": {
+    "confidence_levels": {
+      "haute": "Dynamic GPU with prescriptions+infos OR static with adjustments+reglement",
+      "moyenne": "Dynamic GPU zone-only OR static with reglement OR excluded zones",
+      "basse": "Static code-only scoring"
+    },
+    "confidence_detail_examples": {
+      "haute": "GPU dynamique : zone + 2 prescription(s) + 3 info(s) + analyse destination",
+      "moyenne": "Scoring statique + analyse règlement",
+      "basse": "Scoring statique par code zone uniquement"
+    },
+    "frontend_indicator": {
+      "location": "ParcelDetail panel, data-testid='plu-confidence'",
+      "format": "3 colored dots + confidence level text",
+      "colors": {
+        "haute": "#2ed573 (green)",
+        "moyenne": "#ffa502 (orange)",
+        "basse": "#ff4757 (red)"
+      }
+    },
+    "chatbot_indicator": {
+      "location": "Parcel cards in chat results",
+      "format": "Single colored dot + confidence text"
+    },
+    "test_endpoints": {
+      "dynamic_haute": "GET /api/scoring/plu-dynamic?lon=4.94&lat=43.44",
+      "static_basse": "GET /api/scoring/plu/UI",
+      "static_moyenne": "GET /api/scoring/plu/N"
+    }
+  },
+  "mocked_api_note": "No mocked APIs - uses real GPU API (Géoportail de l'Urbanisme) via apicarto.ign.fr"
+}
