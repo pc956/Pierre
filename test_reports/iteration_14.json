@@ -1,0 +1,123 @@
+{
+  "summary": "Iteration 14 Testing Complete - Dynamic PLU Scoring via GPU API. All 20 backend tests passed. New /api/scoring/plu-dynamic endpoint fetches real GPU data (zone-urba, prescription-surf, info-surf) and analyzes prescriptions, informations, and destination dominante for comprehensive PLU scoring.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "=== DYNAMIC PLU SCORING ENDPOINT (5/5) ===",
+    "GET /api/scoring/plu-dynamic?lon=4.94&lat=43.44 (Fos) returns gpu_source=dynamic with zone_pprt_ppr flag",
+    "GET /api/scoring/plu-dynamic?lon=4.85&lat=45.74 (Lyon) returns vocation_industrielle_confirmee flag",
+    "plu_score_base and plu_score_dynamic_adj fields present showing base vs adjustment",
+    "gpu_data contains prescriptions_count, informations_count, risk_labels, destination_analysis",
+    "Unavailable location (ocean) returns gpu_source=unavailable with fallback",
+    "=== DYNAMIC PLU RISK DETECTION (4/4) ===",
+    "PPRT/PPR detection from GPU informations (zone_pprt_ppr flag, risk_labels: ['PPRT FOS EST'])",
+    "ZAC detection gives +8 bonus (zone_zac_gpu flag)",
+    "EBC prescription detection (-15 penalty)",
+    "Destination dominante analysis: industrial_signals, residential_signals, nature_signals",
+    "=== STATIC PLU BACKWARD COMPATIBILITY (3/3) ===",
+    "GET /api/scoring/plu/UI returns score=90, status=FAVORABLE (unchanged)",
+    "GET /api/scoring/plu/N returns score=0, status=EXCLUDED (unchanged)",
+    "POST /api/scoring/plu with adjustments works correctly",
+    "=== CHATBOT DYNAMIC PLU INTEGRATION (2/2) ===",
+    "POST /api/chat parcel search returns parcels with plu_scoring containing gpu_source",
+    "Chatbot auto-excludes EXCLUDED PLU parcels from results",
+    "=== PREVIOUS FEATURES STILL WORK (5/5) ===",
+    "GET /api/map/rte-future-400kv returns line + buffers + metadata",
+    "GET /api/map/electrical-assets returns 150 assets",
+    "GET /api/map/dc returns 61 DC existants",
+    "GET /api/map/landing-points returns landing points",
+    "POST /api/export/pdf generates valid PDF",
+    "=== FRONTEND VERIFICATION ===",
+    "Dashboard loads with map, layers panel, S3REnR summary",
+    "Chatbot opens and processes parcel search queries",
+    "Chatbot parcel cards show PLU score badges with color coding",
+    "ParcelDetail panel has GPU Dynamique badge when gpu_source=dynamic",
+    "ParcelDetail shows prescriptions_count and informations_count from GPU data",
+    "ParcelDetail shows risk_labels (e.g., PPRT FOS EST)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_plu_dynamic_iteration14.py",
+    "/app/test_reports/pytest/pytest_results_plu_dynamic_iteration14.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_plu_dynamic_iteration14.py"
+  ],
+  "success_rate": {
+    "backend": "100% (20/20 tests passed)",
+    "frontend": "100% (all dynamic PLU features working)"
+  },
+  "test_credentials": "Cookie: session_token=test_session_token_2026",
+  "seed_data_creation": "No seed data needed - uses real GPU API (apicarto.ign.fr) for PLU data",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 14 tested the NEW Dynamic PLU Scoring via GPU API. Key findings: 1) GET /api/scoring/plu-dynamic?lon=X&lat=Y fetches real GPU data from apicarto.ign.fr (zone-urba, prescription-surf, info-surf) in parallel. 2) Response includes gpu_source='dynamic', plu_score_base, plu_score_dynamic_adj, and gpu_data with prescriptions_count, informations_count, risk_labels, destination_analysis. 3) Prescription analysis: EBC (-15), patrimoine (-12), limitation (-8). 4) Information analysis: PPRT/PPR (-10), ZAC (+8), voie_bruyante, archeologie. 5) Destination dominante analysis detects industrial/residential/nature keywords in libelong text. 6) Chatbot uses dynamic PLU scoring for parcel search and auto-excludes EXCLUDED parcels. 7) Frontend ParcelDetail shows GPU Dynamique badge with prescriptions/informations counts and risk labels. 8) Static PLU scoring (/api/scoring/plu/UI) still works for backward compatibility.",
+  "feature_verification": {
+    "dynamic_plu_scoring": {
+      "endpoint": "GET /api/scoring/plu-dynamic?lon=X&lat=Y",
+      "gpu_api_calls": [
+        "apicarto.ign.fr/api/gpu/zone-urba",
+        "apicarto.ign.fr/api/gpu/prescription-surf",
+        "apicarto.ign.fr/api/gpu/info-surf"
+      ],
+      "response_fields": {
+        "gpu_source": "dynamic",
+        "plu_score": "final score (0-100)",
+        "plu_score_base": "base score from zone type",
+        "plu_score_dynamic_adj": "adjustment from prescriptions/informations/destination",
+        "plu_status": "FAVORABLE/WATCHLIST/CONDITIONAL/UNFAVORABLE/EXCLUDED",
+        "flags": "array of detected flags",
+        "gpu_data": {
+          "prescriptions_count": "number of prescriptions analyzed",
+          "informations_count": "number of informations analyzed",
+          "risk_labels": "array of risk labels (e.g., PPRT FOS EST)",
+          "destination_analysis": {
+            "industrial_signals": "count of industrial keywords",
+            "residential_signals": "count of residential keywords",
+            "nature_signals": "count of nature keywords",
+            "flags": "vocation flags",
+            "score_adjustment": "adjustment from destination analysis"
+          }
+        }
+      }
+    },
+    "prescription_adjustments": {
+      "EBC": "-15 pts (Espace Boisé Classé)",
+      "patrimoine": "-12 pts (Monument historique, ABF)",
+      "limitation_constructibilite": "-8 pts",
+      "emplacement_reserve": "-5 pts"
+    },
+    "information_adjustments": {
+      "PPRT_PPR": "-10 pts (Plan de Prévention des Risques)",
+      "ZAC": "+8 pts (Zone d'Aménagement Concerté)",
+      "archeologie": "-5 pts (Sensibilité archéologique)"
+    },
+    "destination_adjustments": {
+      "vocation_industrielle_confirmee": "+8 pts (≥2 industrial keywords)",
+      "vocation_activite_probable": "+4 pts (1 industrial keyword)",
+      "vocation_residentielle_detectee": "-10 pts (≥2 residential keywords)",
+      "mixite_residentielle_possible": "-5 pts (1 residential keyword)",
+      "vocation_naturelle_agricole_detectee": "-15 pts (≥1 nature keyword)"
+    },
+    "test_locations": {
+      "fos_sur_mer": {
+        "coordinates": "lon=4.94, lat=43.44",
+        "expected_flags": ["zone_pprt_ppr", "voie_bruyante"],
+        "risk_labels": ["PPRT FOS EST"]
+      },
+      "lyon": {
+        "coordinates": "lon=4.85, lat=45.74",
+        "expected_flags": ["vocation_industrielle_confirmee", "prescription_patrimoine"]
+      }
+    }
+  },
+  "mocked_api_note": "No mocked APIs - uses real GPU API (Géoportail de l'Urbanisme) via apicarto.ign.fr"
+}

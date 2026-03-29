@@ -130,6 +130,86 @@ async def get_gpu_zone_urba_for_point(lon: float, lat: float) -> Optional[Dict[s
     return None
 
 
+async def get_gpu_full_context(lon: float, lat: float) -> Dict[str, Any]:
+    """
+    Get FULL PLU context from GPU API for dynamic PLU scoring.
+    Fetches zone-urba + prescription-surf + info-surf in parallel.
+    Returns enriched zone data with prescriptions and risk info.
+    """
+    geom_str = f'{{"type":"Point","coordinates":[{lon},{lat}]}}'
+    result = {
+        "zone": None,
+        "prescriptions": [],
+        "informations": [],
+        "raw_features_count": 0,
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=12) as client:
+            # Parallel fetch of zone, prescriptions, and informations
+            import asyncio
+            zone_req = client.get(
+                "https://apicarto.ign.fr/api/gpu/zone-urba",
+                params={"geom": geom_str}
+            )
+            presc_req = client.get(
+                "https://apicarto.ign.fr/api/gpu/prescription-surf",
+                params={"geom": geom_str}
+            )
+            info_req = client.get(
+                "https://apicarto.ign.fr/api/gpu/info-surf",
+                params={"geom": geom_str}
+            )
+            
+            responses = await asyncio.gather(zone_req, presc_req, info_req, return_exceptions=True)
+            
+            # Parse zone-urba
+            if not isinstance(responses[0], Exception) and responses[0].status_code == 200:
+                zone_data = responses[0].json()
+                features = zone_data.get("features", [])
+                if features:
+                    props = features[0].get("properties", {})
+                    result["zone"] = {
+                        "typezone": props.get("typezone", ""),
+                        "libelle": props.get("libelle", ""),
+                        "libelong": props.get("libelong", ""),
+                        "destdomi": props.get("destdomi", ""),
+                        "nomfic": props.get("nomfic", ""),
+                        "idurba": props.get("idurba", ""),
+                        "partition": props.get("partition", ""),
+                        "datvalid": props.get("datvalid", ""),
+                    }
+                    result["raw_features_count"] = len(features)
+            
+            # Parse prescriptions
+            if not isinstance(responses[1], Exception) and responses[1].status_code == 200:
+                presc_data = responses[1].json()
+                for f in presc_data.get("features", []):
+                    p = f.get("properties", {})
+                    result["prescriptions"].append({
+                        "libelle": p.get("libelle", ""),
+                        "txt": p.get("txt", ""),
+                        "typepsc": p.get("typepsc", ""),
+                        "stypepsc": p.get("stypepsc", ""),
+                    })
+            
+            # Parse informations (risques, servitudes)
+            if not isinstance(responses[2], Exception) and responses[2].status_code == 200:
+                info_data = responses[2].json()
+                for f in info_data.get("features", []):
+                    p = f.get("properties", {})
+                    result["informations"].append({
+                        "libelle": p.get("libelle", ""),
+                        "txt": p.get("txt", ""),
+                        "typeinf": p.get("typeinf", ""),
+                        "stypeinf": p.get("stypeinf", ""),
+                    })
+    except Exception:
+        pass
+    
+    return result
+
+
 async def get_gpu_zones_for_bbox(min_lon: float, min_lat: float, max_lon: float, max_lat: float) -> List[Dict[str, Any]]:
     """
     Get all PLU zones within a bounding box from GPU

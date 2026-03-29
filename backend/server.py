@@ -25,7 +25,7 @@ from seed_data import get_seed_data
 from api_carto import (
     search_communes, get_parcelles_by_commune, get_parcelles_by_bbox,
     get_parcelles_around_point, get_sections_by_commune, parse_parcelle_feature,
-    get_gpu_zone_urba_for_point, get_gpu_zones_for_bbox
+    get_gpu_zone_urba_for_point, get_gpu_zones_for_bbox, get_gpu_full_context
 )
 from france_infra_data import get_all_france_infra
 from s3renr_data import S3RENR_DATA, get_s3renr_top_opportunities
@@ -38,7 +38,7 @@ from rte_future_line import (
     get_future_line_geojson, distance_to_future_line, get_buffer_zone,
     score_future_400kv, compute_future_grid_potential
 )
-from plu_scoring import score_plu, parse_reglement_keywords
+from plu_scoring import score_plu, parse_reglement_keywords, score_plu_dynamic
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -676,6 +676,25 @@ async def score_plu_quick(zone_code: str):
     return score_plu(zone_code=zone_code)
 
 
+@api_router.get("/scoring/plu-dynamic")
+async def score_plu_dynamic_endpoint(lon: float, lat: float):
+    """Dynamic PLU scoring using real GPU API data for a geographic point"""
+    gpu_ctx = await get_gpu_full_context(lon, lat)
+    if not gpu_ctx.get("zone"):
+        return {
+            "plu_code": "inconnu",
+            "plu_label": "Données GPU non disponibles",
+            "plu_score": 40,
+            "plu_status": "REVIEW",
+            "exclusion_reason": None,
+            "flags": ["gpu_data_unavailable"],
+            "urbanism_risk": "indetermine",
+            "recommended_action": "manual_review",
+            "gpu_source": "unavailable",
+        }
+    return score_plu_dynamic(gpu_ctx)
+
+
 @api_router.get("/s3renr/top-opportunities")
 async def get_s3renr_opportunities(min_mw: int = 30, limit: int = 20):
     """Get top S3REnR opportunities for DC siting, sorted by MW available"""
@@ -1156,12 +1175,17 @@ async def get_bbox_parcelles(
             parsed["plu_libelong"] = plu_libelong
             parsed["zone_saturation"] = "inconnu"
             
-            # PLU Scoring for DC compatibility
-            plu_scoring_result = score_plu(
-                zone_code=plu_zone,
-                zone_label=plu_libelle,
-                reglement_text=plu_libelong if plu_libelong else None,
-            )
+            # PLU Scoring — Dynamic via GPU when data is available
+            if plu_zone and plu_zone != "inconnu":
+                plu_scoring_result = score_plu(
+                    zone_code=plu_zone,
+                    zone_label=plu_libelle,
+                    reglement_text=plu_libelong if plu_libelong else None,
+                )
+                plu_scoring_result["gpu_source"] = "static_from_zone"
+            else:
+                plu_scoring_result = score_plu(zone_code="inconnu")
+                plu_scoring_result["gpu_source"] = "fallback"
             parsed["plu_scoring"] = plu_scoring_result
             
             # Future 400kV line distance & scoring

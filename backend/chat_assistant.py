@@ -13,12 +13,12 @@ from dotenv import load_dotenv
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 from dc_search_api import dc_search, dc_get_site
-from api_carto import get_parcelles_around_point, parse_parcelle_feature, get_gpu_zone_urba_for_point
+from api_carto import get_parcelles_around_point, parse_parcelle_feature, get_gpu_zone_urba_for_point, get_gpu_full_context
 from france_infra_data import get_all_france_infra
 from rte_future_line import distance_to_future_line, get_buffer_zone, score_future_400kv
 from scoring import compute_full_score
 from dvf_data import get_dvf_for_commune
-from plu_scoring import score_plu
+from plu_scoring import score_plu, score_plu_dynamic
 
 load_dotenv()
 logger = logging.getLogger("chat_assistant")
@@ -239,29 +239,31 @@ async def _find_real_parcels(params: dict) -> dict:
                 dvf = get_dvf_for_commune(code_dep + "000")
                 parsed["dvf_prix_median_m2"] = dvf.get("prix_median_m2", 0)
             
-            # PLU (attempt quick lookup)
+            # PLU (attempt full GPU context for dynamic scoring)
             try:
-                plu = await get_gpu_zone_urba_for_point(plon, plat)
-                if plu:
-                    parsed["plu_zone"] = plu.get("typezone", "inconnu")
-                    parsed["plu_libelle"] = plu.get("libelle", "")
+                gpu_ctx = await get_gpu_full_context(plon, plat)
+                if gpu_ctx.get("zone"):
+                    parsed["plu_zone"] = gpu_ctx["zone"].get("typezone", "inconnu")
+                    parsed["plu_libelle"] = gpu_ctx["zone"].get("libelle", "")
+                    parsed["plu_libelong"] = gpu_ctx["zone"].get("libelong", "")
+                    # Dynamic PLU scoring with prescriptions + informations
+                    plu_scoring_result = score_plu_dynamic(gpu_ctx)
                 else:
                     parsed["plu_zone"] = "inconnu"
                     parsed["plu_libelle"] = ""
+                    plu_scoring_result = score_plu(zone_code="inconnu")
+                    plu_scoring_result["gpu_source"] = "fallback"
             except Exception:
                 parsed["plu_zone"] = "inconnu"
                 parsed["plu_libelle"] = ""
+                plu_scoring_result = score_plu(zone_code="inconnu")
+                plu_scoring_result["gpu_source"] = "error"
+            
+            parsed["plu_scoring"] = plu_scoring_result
             
             # Filter by PLU zones if specified
             if plu_zones and parsed["plu_zone"] not in plu_zones and parsed["plu_zone"] != "inconnu":
                 continue
-            
-            # PLU Scoring for DC compatibility
-            plu_scoring_result = score_plu(
-                zone_code=parsed["plu_zone"],
-                zone_label=parsed.get("plu_libelle", ""),
-            )
-            parsed["plu_scoring"] = plu_scoring_result
             
             # Auto-exclude parcels with EXCLUDED PLU status
             if plu_scoring_result["plu_status"] == "EXCLUDED":

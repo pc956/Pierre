@@ -2001,6 +2001,43 @@ function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
                   {parcel.plu_scoring.exclusion_reason}
                 </p>
               )}
+              
+              {/* GPU dynamic source indicator */}
+              {parcel.plu_scoring.gpu_source === 'dynamic' && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-center gap-1 text-[9px]">
+                    <span className="px-1.5 py-0.5 rounded" style={{ background: '#00d4aa15', color: '#00d4aa', border: '1px solid #00d4aa33' }}>
+                      GPU Dynamique
+                    </span>
+                    {parcel.plu_scoring.plu_score_base != null && parcel.plu_scoring.plu_score_dynamic_adj !== 0 && (
+                      <span style={{ color: '#8f8f9d' }}>
+                        Base {parcel.plu_scoring.plu_score_base} {parcel.plu_scoring.plu_score_dynamic_adj > 0 ? '+' : ''}{parcel.plu_scoring.plu_score_dynamic_adj}
+                      </span>
+                    )}
+                  </div>
+                  {parcel.plu_scoring.gpu_data?.prescriptions_count > 0 && (
+                    <p className="text-[9px]" style={{ color: '#8f8f9d' }}>
+                      {parcel.plu_scoring.gpu_data.prescriptions_count} prescription(s) analysée(s)
+                    </p>
+                  )}
+                  {parcel.plu_scoring.gpu_data?.informations_count > 0 && (
+                    <p className="text-[9px]" style={{ color: '#8f8f9d' }}>
+                      {parcel.plu_scoring.gpu_data.informations_count} information(s) GPU
+                    </p>
+                  )}
+                  {parcel.plu_scoring.gpu_data?.risk_labels?.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {parcel.plu_scoring.gpu_data.risk_labels.map((r, idx) => (
+                        <span key={idx} className="text-[9px] px-1 py-0.5 rounded" style={{ 
+                          background: '#ff475715', color: '#ff4757' 
+                        }}>
+                          {r}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           

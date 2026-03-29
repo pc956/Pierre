@@ -434,3 +434,308 @@ def score_plu(
         "adjustments": adjustments,
         "keyword_analysis": kw_analysis,
     }
+
+
+# ═══════════════════════════════════════════════════════════
+# PRESCRIPTION & INFO ANALYSIS — GPU data
+# ═══════════════════════════════════════════════════════════
+
+# GPU typepsc codes relevant to DC projects
+PRESCRIPTION_RISK_CODES = {
+    "01": "espace_boise_classe",       # EBC
+    "02": "limitation_constructibilite",
+    "03": "secteur_nouvelles_urbanisations",
+    "05": "emplacements_reserves",
+    "07": "patrimoine_protege",
+    "25": "secteur_mixite",
+}
+
+# GPU typeinf codes relevant to DC projects
+INFO_RISK_CODES = {
+    "02": "secteur_zac",
+    "04": "perimetre_ppr",              # PPR naturel/techno
+    "05": "zones_reglement_ppr",
+    "14": "voie_bruyante",
+    "19": "zone_sensibilite_archeologique",
+    "99": "autre_information",
+}
+
+PPRT_KEYWORDS = ["pprt", "ppr", "risque technologique", "risque industriel", "seveso"]
+ZAC_KEYWORDS = ["zac", "zone d'aménagement concerté", "zone d'aménagement"]
+EBC_KEYWORDS = ["ebc", "espace boisé classé", "espace boisé"]
+PATRIMOINE_KEYWORDS = ["monument historique", "abf", "patrimoine", "site classé", "site inscrit"]
+
+
+def _analyze_prescriptions(prescriptions: list) -> dict:
+    """Analyse les prescriptions GPU pour en déduire des flags DC."""
+    flags = []
+    adjustments = []
+    has_ebc = False
+    has_patrimoine = False
+    has_limitation = False
+
+    for p in prescriptions:
+        lib = (p.get("libelle", "") or "").lower()
+        txt = (p.get("txt", "") or "").lower()
+        combined = f"{lib} {txt}"
+        typepsc = p.get("typepsc", "")
+
+        if typepsc == "01" or any(k in combined for k in EBC_KEYWORDS):
+            has_ebc = True
+            flags.append("prescription_ebc")
+            adjustments.append(("ebc_prescription", "-15"))
+
+        if typepsc == "07" or any(k in combined for k in PATRIMOINE_KEYWORDS):
+            has_patrimoine = True
+            flags.append("prescription_patrimoine")
+            adjustments.append(("patrimoine_prescription", "-12"))
+
+        if typepsc == "02":
+            has_limitation = True
+            flags.append("prescription_limitation_constructibilite")
+            adjustments.append(("limitation_constructibilite", "-8"))
+
+        if typepsc == "05":
+            flags.append("emplacement_reserve")
+            adjustments.append(("emplacement_reserve", "-5"))
+
+    score_adj = 0
+    if has_ebc:
+        score_adj -= 15
+    if has_patrimoine:
+        score_adj -= 12
+    if has_limitation:
+        score_adj -= 8
+
+    return {
+        "flags": flags,
+        "adjustments": adjustments,
+        "score_adjustment": score_adj,
+        "has_ebc": has_ebc,
+        "has_patrimoine": has_patrimoine,
+    }
+
+
+def _analyze_informations(informations: list) -> dict:
+    """Analyse les informations GPU (risques, servitudes)."""
+    flags = []
+    adjustments = []
+    has_pprt = False
+    has_zac = False
+    risk_labels = []
+
+    for info in informations:
+        lib = (info.get("libelle", "") or "").lower()
+        txt = (info.get("txt", "") or "").lower()
+        combined = f"{lib} {txt}"
+        typeinf = info.get("typeinf", "")
+
+        # PPRT / PPR
+        if typeinf in ("04", "05") or any(k in combined for k in PPRT_KEYWORDS):
+            has_pprt = True
+            flags.append("zone_pprt_ppr")
+            risk_labels.append(info.get("libelle", "PPR"))
+            adjustments.append(("pprt_ppr", "-10"))
+
+        # ZAC (positive for DC!)
+        if typeinf == "02" or any(k in combined for k in ZAC_KEYWORDS):
+            has_zac = True
+            flags.append("zone_zac_gpu")
+            adjustments.append(("zac_detected_gpu", "+8"))
+
+        # Voie bruyante (neutral — DC are noisy anyway)
+        if typeinf == "14":
+            flags.append("voie_bruyante")
+
+        # Archaeological sensitivity
+        if typeinf == "19":
+            flags.append("sensibilite_archeologique")
+            adjustments.append(("archeologie", "-5"))
+
+    score_adj = 0
+    if has_pprt:
+        score_adj -= 10
+    if has_zac:
+        score_adj += 8
+
+    return {
+        "flags": flags,
+        "adjustments": adjustments,
+        "score_adjustment": score_adj,
+        "has_pprt": has_pprt,
+        "has_zac": has_zac,
+        "risk_labels": risk_labels,
+    }
+
+
+def _detect_destdomi(destdomi: str, libelong: str) -> dict:
+    """Analyse la destination dominante et le libelong pour détecter la vocation du sol."""
+    flags = []
+    score_adj = 0
+    text = f"{destdomi or ''} {libelong or ''}".lower()
+
+    # Industrial / activity keywords — very favorable for DC
+    industrial_kw = [
+        "activit", "industriel", "logistique", "artisan", "entrepôt",
+        "zone d'activit", "parc d'activit", "technolog",
+        "equipement", "énergie", "portuaire",
+    ]
+    # Residential keywords — unfavorable
+    residential_kw = [
+        "habitat", "résidentiel", "logement", "collectif", "pavillonnaire",
+        "densité", "maison",
+    ]
+    # Nature/agriculture keywords — eliminatory
+    nature_kw = [
+        "naturel", "agricol", "vignoble", "forestier", "espace vert",
+    ]
+
+    ind_count = sum(1 for k in industrial_kw if k in text)
+    res_count = sum(1 for k in residential_kw if k in text)
+    nat_count = sum(1 for k in nature_kw if k in text)
+
+    if ind_count >= 2:
+        flags.append("vocation_industrielle_confirmee")
+        score_adj += 8
+    elif ind_count == 1:
+        flags.append("vocation_activite_probable")
+        score_adj += 4
+
+    if res_count >= 2:
+        flags.append("vocation_residentielle_detectee")
+        score_adj -= 10
+    elif res_count == 1:
+        flags.append("mixite_residentielle_possible")
+        score_adj -= 5
+
+    if nat_count >= 1:
+        flags.append("vocation_naturelle_agricole_detectee")
+        score_adj -= 15
+
+    return {
+        "flags": flags,
+        "score_adjustment": score_adj,
+        "industrial_signals": ind_count,
+        "residential_signals": res_count,
+        "nature_signals": nat_count,
+    }
+
+
+def score_plu_dynamic(gpu_context: dict) -> dict:
+    """
+    Scoring PLU DYNAMIQUE basé sur les données réelles de l'API GPU.
+    Exploite zone-urba, prescriptions, informations, et le texte du règlement.
+
+    Args:
+        gpu_context: dict from api_carto.get_gpu_full_context()
+            {
+                "zone": {typezone, libelle, libelong, destdomi, nomfic, idurba, ...},
+                "prescriptions": [{libelle, txt, typepsc, stypepsc}, ...],
+                "informations": [{libelle, txt, typeinf, stypeinf}, ...],
+            }
+
+    Returns:
+        Full PLU scoring dict with dynamic enrichment
+    """
+    zone = gpu_context.get("zone") or {}
+    prescriptions = gpu_context.get("prescriptions", [])
+    informations = gpu_context.get("informations", [])
+
+    zone_code = zone.get("libelle", "") or zone.get("typezone", "inconnu")
+    type_zone = zone.get("typezone", "")
+    libelong = zone.get("libelong", "")
+    destdomi = zone.get("destdomi", "")
+
+    # Step 1: Base static scoring
+    base_result = score_plu(
+        zone_code=zone_code if zone_code else type_zone,
+        zone_label=libelong,
+        reglement_text=libelong,
+    )
+
+    # If already excluded, return immediately
+    if base_result["plu_status"] == "EXCLUDED":
+        base_result["gpu_source"] = "dynamic"
+        base_result["gpu_data"] = {
+            "zone_raw": zone,
+            "prescriptions_count": len(prescriptions),
+            "informations_count": len(informations),
+        }
+        return base_result
+
+    # Step 2: Analyze prescriptions
+    presc_analysis = _analyze_prescriptions(prescriptions)
+
+    # Step 3: Analyze informations (risques, ZAC)
+    info_analysis = _analyze_informations(informations)
+
+    # Step 4: Analyze destination dominante + libelong
+    dest_analysis = _detect_destdomi(destdomi, libelong)
+
+    # Step 5: Combine all adjustments
+    dynamic_adj = (
+        presc_analysis["score_adjustment"]
+        + info_analysis["score_adjustment"]
+        + dest_analysis["score_adjustment"]
+    )
+
+    all_flags = (
+        base_result.get("flags", [])
+        + presc_analysis["flags"]
+        + info_analysis["flags"]
+        + dest_analysis["flags"]
+    )
+
+    all_adjustments = (
+        base_result.get("adjustments", [])
+        + presc_analysis["adjustments"]
+        + info_analysis["adjustments"]
+    )
+    if dest_analysis["score_adjustment"] != 0:
+        all_adjustments.append(("destination_dominante", f"{dest_analysis['score_adjustment']:+d}"))
+
+    # Final score
+    final_score = max(0, min(100, base_result["plu_score"] + dynamic_adj))
+
+    # Hard exclusion override
+    if presc_analysis["has_ebc"] and base_result["plu_score"] < 50:
+        final_score = 0
+        all_flags.append("hard_exclusion_ebc")
+
+    status = _get_status(final_score)
+    action = _get_recommended_action(status)
+    risk = _get_risk_level(final_score, all_flags)
+
+    # Deduplicate flags
+    seen = set()
+    unique_flags = []
+    for f in all_flags:
+        if f not in seen:
+            seen.add(f)
+            unique_flags.append(f)
+
+    return {
+        "plu_code": zone_code,
+        "plu_label": libelong or base_result.get("plu_label", ""),
+        "plu_score": final_score,
+        "plu_score_base": base_result["plu_score"],
+        "plu_score_dynamic_adj": dynamic_adj,
+        "plu_status": status,
+        "exclusion_reason": None if final_score > 0 else "Score nul après analyse dynamique GPU",
+        "flags": unique_flags,
+        "urbanism_risk": risk,
+        "recommended_action": action,
+        "category": base_result.get("category", "unknown"),
+        "adjustments": all_adjustments,
+        "keyword_analysis": base_result.get("keyword_analysis"),
+        "gpu_source": "dynamic",
+        "gpu_data": {
+            "zone_raw": zone,
+            "prescriptions_count": len(prescriptions),
+            "informations_count": len(informations),
+            "prescriptions_flags": presc_analysis["flags"],
+            "informations_flags": info_analysis["flags"],
+            "destination_analysis": dest_analysis,
+            "risk_labels": info_analysis.get("risk_labels", []),
+        },
+    }
