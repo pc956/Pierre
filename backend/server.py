@@ -18,9 +18,9 @@ import uuid
 
 from models import (
     User, UserSession, Tenant, Parcel, ParcelScore, 
-    Shortlist, ShortlistItem, Alert, ProjectType, Verdict
+    Shortlist, ShortlistItem, Alert, Verdict
 )
-from scoring import compute_full_score
+from scoring import compute_score_simple
 from seed_data import get_seed_data
 from api_carto import (
     search_communes, get_parcelles_by_commune, get_parcelles_by_bbox,
@@ -309,7 +309,7 @@ async def get_parcels(
     # Batch fetch scores using $in operator (optimized — no N+1)
     parcel_ids = [p["parcel_id"] for p in parcels]
     score_docs = await db.parcel_scores.find(
-        {"parcel_id": {"$in": parcel_ids}, "project_type": project_type, "is_latest": True},
+        {"parcel_id": {"$in": parcel_ids}, "is_latest": True},
         {"_id": 0}
     ).to_list(len(parcel_ids))
     score_map = {s["parcel_id"]: s for s in score_docs}
@@ -343,12 +343,12 @@ async def get_parcel(parcel_id: str):
     }
 
 
-@api_router.get("/parcels/{parcel_id}/score/{project_type}")
-async def get_parcel_score(parcel_id: str, project_type: str):
+@api_router.get("/parcels/{parcel_id}/score")
+async def get_parcel_score(parcel_id: str):
     """Get or compute score for parcel and project type"""
     # Check if score exists
     score_doc = await db.parcel_scores.find_one(
-        {"parcel_id": parcel_id, "project_type": project_type, "is_latest": True},
+        {"parcel_id": parcel_id, "is_latest": True},
         {"_id": 0}
     )
     
@@ -360,7 +360,8 @@ async def get_parcel_score(parcel_id: str, project_type: str):
     if not parcel:
         raise HTTPException(status_code=404, detail="Parcel not found")
     
-    score_data = compute_full_score(parcel, project_type)
+    score_data = compute_score_simple(parcel)
+    score_data["parcel_id"] = parcel_id
     score_data["score_id"] = f"score_{uuid.uuid4().hex[:12]}"
     score_data["computed_at"] = datetime.now(timezone.utc).isoformat()
     score_data["is_latest"] = True
@@ -395,12 +396,13 @@ async def search_project(req: SearchRequest, request: Request):
     for parcel in parcels:
         # Get or compute score
         score_doc = await db.parcel_scores.find_one(
-            {"parcel_id": parcel["parcel_id"], "project_type": req.project_type, "is_latest": True},
+            {"parcel_id": parcel["parcel_id"], "is_latest": True},
             {"_id": 0}
         )
         
         if not score_doc:
-            score_data = compute_full_score(parcel, req.project_type)
+            score_data = compute_score_simple(parcel)
+            score_data["parcel_id"] = parcel["parcel_id"]
             score_data["score_id"] = f"score_{uuid.uuid4().hex[:12]}"
             score_data["computed_at"] = datetime.now(timezone.utc).isoformat()
             score_data["is_latest"] = True
@@ -408,7 +410,7 @@ async def search_project(req: SearchRequest, request: Request):
             score_doc = score_data
         
         # Apply filters
-        if req.score_min and score_doc.get("score_net", 0) < req.score_min:
+        if req.score_min and score_doc.get("score", score_doc.get("score_net", 0)) < req.score_min:
             continue
         if req.ttm_max and score_doc.get("ttm_max_months", 999) > req.ttm_max:
             continue
@@ -446,12 +448,13 @@ async def compare_parcels(parcel_ids: List[str], project_type: str = "colocation
             continue
         
         score_doc = await db.parcel_scores.find_one(
-            {"parcel_id": pid, "project_type": project_type, "is_latest": True},
+            {"parcel_id": pid, "is_latest": True},
             {"_id": 0}
         )
         
         if not score_doc:
-            score_data = compute_full_score(parcel, project_type)
+            score_data = compute_score_simple(parcel)
+            score_data["parcel_id"] = pid
             score_data["score_id"] = f"score_{uuid.uuid4().hex[:12]}"
             score_data["computed_at"] = datetime.now(timezone.utc).isoformat()
             score_data["is_latest"] = True
@@ -583,8 +586,8 @@ async def get_map_parcels(
     # Get scores
     parcel_ids = [p["parcel_id"] for p in parcels]
     scores = await db.parcel_scores.find(
-        {"parcel_id": {"$in": parcel_ids}, "project_type": project_type, "is_latest": True},
-        {"_id": 0, "parcel_id": 1, "score_net": 1, "verdict": 1, "power_mw_p50": 1, "ttm_max_months": 1}
+        {"parcel_id": {"$in": parcel_ids}, "is_latest": True},
+        {"_id": 0, "parcel_id": 1, "score": 1, "verdict": 1}
     ).to_list(500)
     
     score_map = {s["parcel_id"]: s for s in scores}
@@ -594,10 +597,8 @@ async def get_map_parcels(
         score = score_map.get(p["parcel_id"], {})
         result.append({
             **p,
-            "score_net": score.get("score_net", 0),
-            "verdict": score.get("verdict", "CONDITIONNEL"),
-            "power_mw_p50": score.get("power_mw_p50"),
-            "ttm_max_months": score.get("ttm_max_months")
+            "score": score.get("score", 0),
+            "verdict": score.get("verdict", "A_ETUDIER"),
         })
     
     return {"parcels": result}
@@ -986,7 +987,7 @@ async def search_french_communes(q: str, limit: int = 20):
 
 
 @api_router.get("/france/parcelles/commune/{code_insee}")
-async def get_commune_parcelles(code_insee: str, section: Optional[str] = None, project_type: str = "colocation_t3"):
+async def get_commune_parcelles(code_insee: str, section: Optional[str] = None):
     """
     Get all parcelles for a French commune from API Carto
     Warning: Large communes can return thousands of parcels
@@ -1006,12 +1007,14 @@ async def get_commune_parcelles(code_insee: str, section: Optional[str] = None, 
             # Find nearest HTB post
             min_dist_htb = 999999
             nearest_htb_kv = 0
+            nearest_htb_name = ""
             for htb in _FRANCE_INFRA["postes_htb"]:
                 hcoords = htb["geometry"]["coordinates"]
                 dist = _haversine(plon, plat, hcoords[0], hcoords[1])
                 if dist < min_dist_htb:
                     min_dist_htb = dist
                     nearest_htb_kv = htb["tension_kv"]
+                    nearest_htb_name = htb.get("nom", "")
             
             # Find nearest landing point
             min_dist_lp = 999999
@@ -1027,13 +1030,10 @@ async def get_commune_parcelles(code_insee: str, section: Optional[str] = None, 
             
             parsed["dist_poste_htb_m"] = int(min_dist_htb)
             parsed["tension_htb_kv"] = nearest_htb_kv
+            parsed["nearest_htb_name"] = nearest_htb_name
             parsed["dist_landing_point_km"] = round(min_dist_lp / 1000, 1)
             parsed["landing_point_nom"] = nearest_lp_name
             parsed["landing_point_nb_cables"] = nearest_lp_cables
-            parsed["dist_poste_hta_m"] = 3000
-            parsed["dist_backbone_fibre_m"] = 2000
-            parsed["nb_operateurs_fibre"] = 2
-            parsed["plu_zone"] = "U"
             parsed["zone_saturation"] = "inconnu"
             
             # Future 400kV line distance & scoring
@@ -1042,20 +1042,14 @@ async def get_commune_parcelles(code_insee: str, section: Optional[str] = None, 
             parsed["future_400kv_buffer"] = get_buffer_zone(plon, plat)
             parsed["future_400kv_score_bonus"] = score_future_400kv(plon, plat)
             
-            # Compute score
+            # Compute score (universel /100)
             try:
-                score_data = compute_full_score(parsed, project_type)
-                base_score = score_data.get("score_net", 0)
+                score_data = compute_score_simple(parsed)
                 bonus_400kv = score_future_400kv(plon, plat)
-                parsed["score"] = {
-                    "score_net": min(100, base_score + bonus_400kv),
-                    "score_net_base": base_score,
-                    "future_400kv_bonus": bonus_400kv,
-                    "verdict": score_data.get("verdict", "CONDITIONNEL"),
-                    "power_mw_p50": score_data.get("power_mw_p50", 0),
-                }
+                score_data["score"] = min(100, score_data["score"] + bonus_400kv)
+                parsed["score"] = score_data
             except Exception:
-                parsed["score"] = {"score_net": 0, "verdict": "CONDITIONNEL"}
+                parsed["score"] = {"score": 0, "verdict": "A_ETUDIER", "detail": {}, "flags": [], "resume": ""}
             
             parcelles.append(parsed)
     
@@ -1214,26 +1208,14 @@ async def get_bbox_parcelles(
             )
             parsed["future_grid_potential"] = fgp
             
-            # Compute score
+            # Compute score (universel /100)
             try:
-                score_data = compute_full_score(parsed, project_type)
-                base_score = score_data.get("score_net", 0)
-                # Add future 400kV bonus to the score
+                score_data = compute_score_simple(parsed)
                 bonus_400kv = score_future_400kv(plon, plat)
-                adjusted_score = min(100, base_score + bonus_400kv)
-                parsed["score"] = {
-                    "score_net": adjusted_score,
-                    "score_net_base": base_score,
-                    "future_400kv_bonus": bonus_400kv,
-                    "verdict": score_data.get("verdict", "CONDITIONNEL"),
-                    "power_mw_p50": score_data.get("power_mw_p50", 0),
-                    "score_electricite": score_data.get("score_electricite", 0),
-                    "score_fibre": score_data.get("score_fibre", 0),
-                    "ttm_min_months": score_data.get("ttm_min_months"),
-                    "ttm_max_months": score_data.get("ttm_max_months"),
-                }
+                score_data["score"] = min(100, score_data["score"] + bonus_400kv)
+                parsed["score"] = score_data
             except Exception:
-                parsed["score"] = {"score_net": 0, "verdict": "CONDITIONNEL"}
+                parsed["score"] = {"score": 0, "verdict": "A_ETUDIER", "detail": {}, "flags": [], "resume": ""}
             
             parcelles.append(parsed)
     
@@ -1402,8 +1384,8 @@ async def get_shortlist(shortlist_id: str, request: Request):
     parcel_map = {p["parcel_id"]: p for p in parcels_list}
     
     scores_cursor = db.parcel_scores.find(
-        {"parcel_id": {"$in": parcel_ids}, "project_type": shortlist.get("project_type", "colocation_t3"), "is_latest": True},
-        {"_id": 0, "parcel_id": 1, "score_net": 1, "verdict": 1, "power_mw_p50": 1, "ttm_max_months": 1}
+        {"parcel_id": {"$in": parcel_ids}, "is_latest": True},
+        {"_id": 0, "parcel_id": 1, "score": 1, "verdict": 1}
     )
     scores_list = await scores_cursor.to_list(len(parcel_ids))
     score_map = {s["parcel_id"]: s for s in scores_list}
@@ -1564,14 +1546,14 @@ async def seed_database():
     if seed_data.get("electrical_assets"):
         await db.electrical_assets.insert_many(seed_data["electrical_assets"])
     
-    # Compute scores for all parcels (colocation_t3 as default)
+    # Compute scores for all parcels (universel /100)
     for parcel in seed_data["parcels"]:
-        for project_type in ["colocation_t3", "hyperscale", "edge"]:
-            score_data = compute_full_score(parcel, project_type)
-            score_data["score_id"] = f"score_{uuid.uuid4().hex[:12]}"
-            score_data["computed_at"] = datetime.now(timezone.utc).isoformat()
-            score_data["is_latest"] = True
-            await db.parcel_scores.insert_one(score_data)
+        score_data = compute_score_simple(parcel)
+        score_data["parcel_id"] = parcel["parcel_id"]
+        score_data["score_id"] = f"score_{uuid.uuid4().hex[:12]}"
+        score_data["computed_at"] = datetime.now(timezone.utc).isoformat()
+        score_data["is_latest"] = True
+        await db.parcel_scores.insert_one(score_data)
     
     return {
         "success": True,

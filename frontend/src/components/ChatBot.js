@@ -379,79 +379,123 @@ function ChatMessage({ msg, onSiteClick, onParcelClick }) {
             )}
             {msg.sites_searched && msg.sites_searched.length > 0 && (
               <div className="text-[10px] px-2 py-1 rounded" style={{ background: '#0a0a0f', border: '1px solid #1f1f2e', color: '#8f8f9d' }}>
-                Recherche autour de : {msg.sites_searched.map(s => `${s.name} (${s.grid.mw_dispo}MW)`).join(', ')}
+                Recherche autour de : {msg.sites_searched.map(s => s.name).join(', ')}
               </div>
             )}
             {msg.parcels.slice(0, 10).map((p, i) => {
-              const scoreVal = p.score?.score_net || 0;
+              const scoreVal = p.score?.score || p.score?.score_net || 0;
+              const verdict = p.score?.verdict || 'A_ETUDIER';
+              const detail = p.score?.detail || {};
+              const flags = p.score?.flags || [];
+              const resume = p.score?.resume || '';
               const scoreColor = scoreVal >= 70 ? '#2ed573' : scoreVal >= 40 ? '#ffa502' : '#ff4757';
+              const verdictLabel = verdict === 'GO' ? 'GO' : verdict === 'A_ETUDIER' ? 'À ÉTUDIER' : verdict === 'EXCLU' ? 'EXCLU' : 'DÉFAVORABLE';
+
+              // Google Maps URL
+              const gmapsUrl = `https://www.google.com/maps?q=${p.latitude},${p.longitude}&z=17`;
+
               return (
                 <div
                   key={p.parcel_id}
                   className="p-2 rounded cursor-pointer hover:opacity-80 transition-all"
-                  style={{ background: '#12121a', border: '1px solid #1f1f2e' }}
+                  style={{ background: '#12121a', border: `1px solid ${scoreColor}33` }}
                   onClick={() => onParcelClick && onParcelClick(p)}
                   data-testid={`chat-parcel-${i}`}
                 >
+                  {/* Header: ref + score */}
                   <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-[11px]" style={{ color: '#e8e8ed' }}>
+                    <a
+                      href={gmapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="font-mono font-bold text-[11px] hover:underline"
+                      style={{ color: '#e8e8ed' }}
+                      data-testid={`parcel-ref-link-${i}`}
+                    >
                       {p.ref_cadastrale || p.parcel_id}
-                    </span>
-                    <span className="font-mono text-[10px] px-1.5 rounded" style={{
-                      background: scoreColor + '22',
-                      color: scoreColor,
-                    }}>
-                      {scoreVal.toFixed(0)}/100
-                    </span>
+                    </a>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-[10px] px-1.5 py-0.5 rounded font-bold" style={{
+                        background: scoreColor + '22',
+                        color: scoreColor,
+                      }}>
+                        {scoreVal}/100
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{
+                        background: scoreColor + '15',
+                        color: scoreColor,
+                        border: `1px solid ${scoreColor}33`,
+                      }}>
+                        {verdictLabel}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 mt-1 text-[10px] flex-wrap" style={{ color: '#8f8f9d' }}>
+
+                  {/* Resume line */}
+                  {resume && (
+                    <p className="mt-1 text-[9px] leading-tight" style={{ color: '#aaa' }}>
+                      {resume.length > 120 ? resume.substring(0, 120) + '...' : resume}
+                    </p>
+                  )}
+
+                  {/* Key metrics */}
+                  <div className="flex items-center gap-1.5 mt-1.5 text-[10px] flex-wrap" style={{ color: '#8f8f9d' }}>
                     <span><MapPin size={9} className="inline" /> {p.commune || p.region}</span>
                     <span className="font-bold" style={{ color: '#00d4aa' }}>{p.surface_ha?.toFixed(2)} ha</span>
                     <span>HTB: {(p.dist_poste_htb_m / 1000).toFixed(1)}km</span>
+                    {p.mw_dispo > 0 && (
+                      <span style={{ color: '#ffa502' }}>{p.mw_dispo}MW</span>
+                    )}
                     {p.plu_zone && p.plu_zone !== 'inconnu' && (
                       <span className="px-1 rounded" style={{ background: '#3b82f622', color: '#3b82f6' }}>
                         PLU {p.plu_zone}
                       </span>
                     )}
                   </div>
+
+                  {/* Score breakdown bars (Étape 8) */}
+                  {detail && Object.keys(detail).length > 0 && (
+                    <div className="mt-1.5 space-y-0.5">
+                      <ScoreBar label="RTE" value={detail.distance_rte || 0} max={40} />
+                      <ScoreBar label="MW" value={detail.mw_disponibles || 0} max={30} />
+                      <ScoreBar label="PLU" value={detail.plu || 0} max={20} />
+                      <ScoreBar label="Surface" value={detail.surface || 0} max={10} />
+                      {detail.malus < 0 && (
+                        <div className="flex items-center gap-1 text-[9px]">
+                          <span style={{ color: '#ff4757' }}>Malus: {detail.malus}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Flags */}
+                  {flags.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {flags.map((f, fi) => (
+                        <span key={fi} className="text-[8px] px-1 py-0.5 rounded" style={{ background: '#ff475722', color: '#ff4757' }}>
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Extra info */}
                   <div className="flex items-center gap-1.5 mt-0.5 text-[10px]" style={{ color: '#8f8f9d' }}>
                     <span>{p.tension_htb_kv}kV</span>
                     {p.dvf_prix_median_m2 > 0 && <span>{p.dvf_prix_median_m2}€/m²</span>}
-                    <span>LP: {p.dist_landing_point_km}km</span>
+                    {p.dist_backbone_fibre_m > 0 && <span>Fibre: {(p.dist_backbone_fibre_m / 1000).toFixed(1)}km</span>}
                     {p.future_400kv_buffer && (
                       <span className="px-1 rounded" style={{ background: '#ff004022', color: '#ff4757' }}>
                         400kV {p.future_400kv_buffer}
                       </span>
                     )}
-                    {p.plu_scoring && (
+                    {p.zone_saturation && p.zone_saturation !== 'inconnu' && (
                       <span className="px-1 rounded" style={{ 
-                        background: p.plu_scoring.plu_status === 'FAVORABLE' ? '#2ed57322' 
-                                  : p.plu_scoring.plu_status === 'WATCHLIST' ? '#ffa50222' 
-                                  : p.plu_scoring.plu_status === 'CONDITIONAL' ? '#f0932b22' 
-                                  : '#ff475722',
-                        color: p.plu_scoring.plu_status === 'FAVORABLE' ? '#2ed573' 
-                             : p.plu_scoring.plu_status === 'WATCHLIST' ? '#ffa502' 
-                             : p.plu_scoring.plu_status === 'CONDITIONAL' ? '#f0932b' 
-                             : '#ff4757',
+                        background: p.zone_saturation === 'disponible' ? '#2ed57322' : p.zone_saturation === 'sature' ? '#ff475722' : '#ffa50222',
+                        color: p.zone_saturation === 'disponible' ? '#2ed573' : p.zone_saturation === 'sature' ? '#ff4757' : '#ffa502',
                       }}>
-                        PLU {p.plu_scoring.plu_score}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-1 flex items-center gap-1 text-[9px]" style={{ color: '#00d4aa88' }}>
-                    <span>{p.score?.verdict} · {p.site_origin}</span>
-                    {p.plu_scoring?.confidence && (
-                      <span className="ml-auto flex items-center gap-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ 
-                          background: p.plu_scoring.confidence === 'haute' ? '#2ed573' 
-                                    : p.plu_scoring.confidence === 'moyenne' ? '#ffa502' : '#ff4757' 
-                        }} />
-                        <span style={{ 
-                          color: p.plu_scoring.confidence === 'haute' ? '#2ed573' 
-                               : p.plu_scoring.confidence === 'moyenne' ? '#ffa502' : '#ff4757' 
-                        }}>
-                          {p.plu_scoring.confidence}
-                        </span>
+                        {p.zone_saturation}
                       </span>
                     )}
                   </div>
@@ -493,6 +537,7 @@ function ChatMessage({ msg, onSiteClick, onParcelClick }) {
                 <span className="font-bold text-[10px]" style={{ color: '#e8e8ed' }}>{r.region}</span>
                 <div className="flex items-center gap-2 text-[10px]">
                   <span style={{ color: '#8f8f9d' }}>{r.nb_postes} postes</span>
+                  <span style={{ color: '#00d4aa' }}>{r.mw_total} MW</span>
                   <span className="px-1.5 rounded" style={{
                     background: r.status === 'SATURE' ? '#ff475722' : '#2ed57322',
                     color: r.status === 'SATURE' ? '#ff4757' : '#2ed573',
@@ -503,6 +548,21 @@ function ChatMessage({ msg, onSiteClick, onParcelClick }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+
+function ScoreBar({ label, value, max }) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  const color = pct >= 75 ? '#2ed573' : pct >= 50 ? '#ffa502' : pct >= 25 ? '#f0932b' : '#ff4757';
+  return (
+    <div className="flex items-center gap-1.5 text-[9px]">
+      <span className="w-10 text-right" style={{ color: '#8f8f9d' }}>{label}</span>
+      <div className="flex-1 h-1.5 rounded-full" style={{ background: '#1f1f2e' }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span className="w-8 text-right" style={{ color }}>{value}/{max}</span>
     </div>
   );
 }

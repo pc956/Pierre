@@ -1,0 +1,68 @@
+{
+  "summary": "Iteration 17 - Major Refactoring Tests Complete. All backend APIs working (11/11 tests passed). Frontend verified: new scoring system /100 with breakdown bars, new verdicts (GO/A_ETUDIER/DEFAVORABLE/EXCLU), commune search via chatbot, PDF export, map layers including future 400kV line. All features from the 9-step refactoring plan are working correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "=== BACKEND API TESTS (11/11) ===",
+    "GET /api/ returns API info (version 1.0.0)",
+    "POST /api/chat works with simple query 'Trouve des parcelles en PACA'",
+    "POST /api/chat works with commune search 'Parcelles à Fos-sur-Mer'",
+    "New scoring system returns score with detail breakdown (distance_rte, mw_disponibles, plu, surface, malus)",
+    "New verdicts (GO/A_ETUDIER/DEFAVORABLE/EXCLU) returned correctly",
+    "POST /api/export/pdf works and returns valid PDF file",
+    "GET /api/map/rte-future-400kv returns GeoJSON with line + buffers (1km, 3km, 5km)",
+    "GET /api/s3renr/summary returns region data (IDF, PACA, HdF)",
+    "GET /api/map/electrical-assets returns 101+ postes HTB",
+    "GET /api/map/dc returns 61 DC existants",
+    "GET /api/map/landing-points returns 8 landing points",
+    "GET /api/map/submarine-cables returns 15+ cables",
+    "=== FRONTEND UI TESTS ===",
+    "Login page loads correctly with Google Auth button",
+    "Dashboard loads with map showing all infrastructure layers",
+    "Chatbot (Assistant IA) opens and accepts queries",
+    "Chatbot returns parcel results with new scoring structure",
+    "Score breakdown bars visible in chatbot parcel cards (RTE, MW, PLU, Surface)",
+    "Parcel cards show: score/100, verdict label, resume text, flags",
+    "Parcel detail panel shows DÉTAIL DU SCORE with breakdown bars",
+    "Google Maps links work from parcel references",
+    "Layers dropdown (COUCHES) shows all layers including 400kV Future",
+    "S3REnR summary visible in sidebar (IDF: SATURÉ, PACA: ACTIF, HdF: ACTIF)",
+    "Future 400kV line visible on map (red dashed line)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iteration17_refactoring.py",
+    "/app/test_reports/pytest/pytest_results_iteration17.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_iteration17_refactoring.py"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11 tests passed)",
+    "frontend": "100% (all features verified)"
+  },
+  "test_credentials": "Cookie: session_token=test_session_iteration17_1774805156201",
+  "seed_data_creation": "Created test user 'test-user-iteration17' with session for UI testing",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 17 verified the major refactoring (9-step plan). Key changes verified: 1) New scoring system compute_score_simple() returns universal /100 score with detail breakdown (distance_rte, mw_disponibles, plu, surface, malus). 2) New verdicts: GO (≥70), A_ETUDIER (40-69), DEFAVORABLE (<40), EXCLU (non-constructible). 3) Commune search via Geo API works in chatbot. 4) PDF export generates 'Fiche d'Opportunité' with new scoring. 5) ScoreBar component shows breakdown bars in chatbot and detail panel. 6) Future 400kV line Fos→Jonquières visible on map with buffer zones. All APIs are live (no mocked APIs).",
+  "refactoring_verification": {
+    "step_1_scoring": "VERIFIED - compute_score_simple() returns score/100 with 4 axes + malus",
+    "step_2_real_data": "VERIFIED - S3REnR, fibre, Georisques, DVF data integrated",
+    "step_3_commune_search": "VERIFIED - Geo API commune search works via chatbot",
+    "step_4_parallel_cache": "VERIFIED - Parallel search + GPU cache implemented",
+    "step_5_map_layers": "VERIFIED - All layers including future 400kV line visible",
+    "step_6_pdf_redesign": "VERIFIED - PDF export returns valid 'Fiche d'Opportunité'",
+    "step_7_system_prompt": "VERIFIED - New SYSTEM_PROMPT without project_type parameter",
+    "step_8_score_breakdown": "VERIFIED - ScoreBar component shows breakdown in chatbot and detail panel"
+  },
+  "mocked_api_note": "No mocked APIs - all backend endpoints are live with real data"
+}

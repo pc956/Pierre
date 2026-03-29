@@ -145,20 +145,29 @@ function getScoreColor(score) {
 function VerdictBadge({ verdict }) {
   const styles = {
     'GO': 'verdict-go',
-    'CONDITIONNEL': 'verdict-conditionnel',
-    'NO_GO': 'verdict-no-go'
+    'A_ETUDIER': 'verdict-conditionnel',
+    'DEFAVORABLE': 'verdict-no-go',
+    'EXCLU': 'verdict-no-go',
   };
   
   const icons = {
     'GO': <CheckCircle size={12} />,
-    'CONDITIONNEL': <AlertTriangle size={12} />,
-    'NO_GO': <XCircle size={12} />
+    'A_ETUDIER': <AlertTriangle size={12} />,
+    'DEFAVORABLE': <XCircle size={12} />,
+    'EXCLU': <XCircle size={12} />,
+  };
+
+  const labels = {
+    'GO': 'GO',
+    'A_ETUDIER': 'À ÉTUDIER',
+    'DEFAVORABLE': 'DÉFAVORABLE',
+    'EXCLU': 'EXCLU',
   };
   
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-mono uppercase ${styles[verdict] || 'verdict-conditionnel'}`}>
-      {icons[verdict]}
-      {verdict?.replace('_', ' ')}
+      {icons[verdict] || <AlertTriangle size={12} />}
+      {labels[verdict] || verdict?.replace('_', ' ')}
     </span>
   );
 }
@@ -168,7 +177,6 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [selectedParcel, setSelectedParcel] = useState(null);
-  const [projectType, setProjectType] = useState('colocation_t3');
   
   // Mobile state
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -219,7 +227,7 @@ export default function Dashboard() {
     setBboxLoading(true);
     try {
       const response = await axios.get(
-        `${API}/france/parcelles/bbox?min_lon=${bounds.min_lon}&min_lat=${bounds.min_lat}&max_lon=${bounds.max_lon}&max_lat=${bounds.max_lat}&project_type=${projectType}&limit=200`
+        `${API}/france/parcelles/bbox?min_lon=${bounds.min_lon}&min_lat=${bounds.min_lat}&max_lon=${bounds.max_lon}&max_lat=${bounds.max_lat}&limit=200`
       );
       const newParcels = response.data.parcelles || [];
       setFranceParcels(prev => {
@@ -233,7 +241,7 @@ export default function Dashboard() {
     } finally {
       setBboxLoading(false);
     }
-  }, [projectType]);
+  }, []);
 
   // Debounced BBox handler
   const handleBoundsChange = useCallback((bounds) => {
@@ -278,7 +286,7 @@ export default function Dashboard() {
     setBboxLoading(true);
     try {
       const response = await axios.get(
-        `${API}/france/parcelles/bbox?min_lon=${bounds.min_lon}&min_lat=${bounds.min_lat}&max_lon=${bounds.max_lon}&max_lat=${bounds.max_lat}&project_type=${projectType}&limit=200`
+        `${API}/france/parcelles/bbox?min_lon=${bounds.min_lon}&min_lat=${bounds.min_lat}&max_lon=${bounds.max_lon}&max_lat=${bounds.max_lat}&limit=200`
       );
       const newParcels = response.data.parcelles || [];
       setFranceParcels(prev => {
@@ -294,7 +302,7 @@ export default function Dashboard() {
     } finally {
       setBboxLoading(false);
     }
-  }, [projectType]);
+  }, []);
 
   const fetchMapLayers = async () => {
     try {
@@ -324,14 +332,6 @@ export default function Dashboard() {
   const toggleLayer = (layerName) => {
     setLayers(prev => ({ ...prev, [layerName]: !prev[layerName] }));
   };
-
-  const PROJECT_TYPES = [
-    { value: 'colocation_t3', label: 'Colocation T3' },
-    { value: 'colocation_t4', label: 'Colocation T4' },
-    { value: 'hyperscale', label: 'Hyperscale' },
-    { value: 'edge', label: 'Edge DC' },
-    { value: 'ai_campus', label: 'AI Campus' },
-  ];
 
   // Filter electrical assets by type
   const postes = electricalAssets.filter(a => a.type === 'poste_htb');
@@ -707,7 +707,7 @@ export default function Dashboard() {
                     
                     {/* Parcels - rendered as cadastral polygons */}
                     {layers.parcels && filteredParcels.map(parcel => {
-                      const score = parcel.score?.score_net || 0;
+                      const score = parcel.score?.score || parcel.score?.score_net || 0;
                       const positions = geoJsonToPositions(parcel.geometry);
                       const color = getScoreColor(score);
                       const isSelected = selectedParcel?.parcel_id === parcel.parcel_id;
@@ -915,7 +915,6 @@ export default function Dashboard() {
                 {selectedParcel ? (
                   <ParcelDetail 
                     parcel={selectedParcel} 
-                    projectType={projectType} 
                     onClose={() => setSelectedParcel(null)}
                     onShowSiren={(p) => setSirenModal(p)}
                   />
@@ -982,15 +981,15 @@ export default function Dashboard() {
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs" style={{ color: '#8f8f9d' }}>Sites CONDITIONNEL</span>
+                        <span className="text-xs" style={{ color: '#8f8f9d' }}>Sites À ÉTUDIER</span>
                         <span className="font-mono text-sm" style={{ color: '#ffa502' }}>
-                          {filteredParcels.filter(p => p.score?.verdict === 'CONDITIONNEL').length}
+                          {filteredParcels.filter(p => p.score?.verdict === 'A_ETUDIER').length}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs" style={{ color: '#8f8f9d' }}>Sites NO-GO</span>
+                        <span className="text-xs" style={{ color: '#8f8f9d' }}>Sites DÉFAVORABLE</span>
                         <span className="font-mono text-sm" style={{ color: '#ff4757' }}>
-                          {filteredParcels.filter(p => p.score?.verdict === 'NO_GO').length}
+                          {filteredParcels.filter(p => ['DEFAVORABLE', 'EXCLU'].includes(p.score?.verdict)).length}
                         </span>
                       </div>
                     </div>
@@ -1232,7 +1231,7 @@ function LayerToggle({ label, color, icon, active, onClick }) {
 }
 
 // Parcel Detail Panel
-function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
+function ParcelDetail({ parcel, onClose, onShowSiren }) {
   const score = parcel.score || {};
   
   return (
@@ -1249,13 +1248,53 @@ function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
       </div>
 
       <div className="p-4 space-y-4">
-        {/* Verdict */}
+        {/* Verdict + Score */}
         <div className="flex items-center gap-3">
           <VerdictBadge verdict={score.verdict} />
-          <span className="text-2xl font-mono font-bold" style={{ color: getScoreColor(score.score_net || 0) }}>
-            {(score.score_net || 0).toFixed(0)}/100
+          <span className="text-2xl font-mono font-bold" style={{ color: getScoreColor(score.score || 0) }}>
+            {(score.score || 0)}/100
           </span>
         </div>
+
+        {/* Resume */}
+        {score.resume && (
+          <p className="text-xs leading-relaxed" style={{ color: '#c8c8d5', background: '#0a0a0f', padding: 8, borderRadius: 4, border: '1px solid #1f1f2e' }}>
+            {score.resume}
+          </p>
+        )}
+
+        {/* Score breakdown */}
+        {score.detail && (
+          <div className="panel p-3">
+            <p className="text-xs font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>Détail du score</p>
+            <div className="space-y-1.5">
+              <DetailBar label="Distance RTE" value={score.detail.distance_rte || 0} max={40} />
+              <DetailBar label="MW disponibles" value={score.detail.mw_disponibles || 0} max={30} />
+              <DetailBar label="PLU" value={score.detail.plu || 0} max={20} />
+              <DetailBar label="Surface" value={score.detail.surface || 0} max={10} />
+              {score.detail.malus < 0 && (
+                <div className="flex justify-between text-xs mt-1">
+                  <span style={{ color: '#ff4757' }}>Malus</span>
+                  <span className="font-mono font-bold" style={{ color: '#ff4757' }}>{score.detail.malus}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Flags */}
+        {score.flags && score.flags.length > 0 && (
+          <div className="panel p-3">
+            <p className="text-xs font-mono uppercase mb-2" style={{ color: '#ff4757' }}>Risques</p>
+            <div className="space-y-1">
+              {score.flags.map((f, i) => (
+                <p key={i} className="text-xs flex items-center gap-1" style={{ color: '#ff4757' }}>
+                  <AlertTriangle size={10} /> {f}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Key metrics */}
         <div className="grid grid-cols-2 gap-3">
@@ -1266,21 +1305,21 @@ function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
             </p>
           </div>
           <div className="panel p-3">
-            <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>MW P50</p>
+            <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>MW dispo</p>
             <p className="text-lg font-mono font-bold" style={{ color: '#00d4aa' }}>
-              {score.power_mw_p50?.toFixed(1) || '-'} MW
+              {parcel.mw_dispo || parcel.zone_saturation || '-'}
             </p>
           </div>
           <div className="panel p-3">
-            <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>TTM</p>
+            <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Dist. HTB</p>
             <p className="text-lg font-mono font-bold" style={{ color: '#3b82f6' }}>
-              {score.ttm_min_months || '-'}-{score.ttm_max_months || '-'} mois
+              {parcel.dist_poste_htb_m ? `${(parcel.dist_poste_htb_m/1000).toFixed(1)} km` : '-'}
             </p>
           </div>
           <div className="panel p-3">
-            <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>IRR Levered</p>
-            <p className="text-lg font-mono font-bold" style={{ color: '#00d4aa' }}>
-              {score.irr_levered_pct?.toFixed(1) || '-'}%
+            <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Zone PLU</p>
+            <p className="text-lg font-mono font-bold" style={{ color: '#e8e8ed' }}>
+              {parcel.plu_zone || '-'}
             </p>
           </div>
         </div>
@@ -1332,7 +1371,7 @@ function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
             <div className="flex justify-between text-xs">
               <span style={{ color: '#8f8f9d' }}>Prix DVF (€/m²)</span>
               <span className="font-mono" style={{ color: '#ffa502' }}>
-                {parcel.dvf_prix_m2_p50 ? `${parcel.dvf_prix_m2_p50.toFixed(0)} €` : '-'}
+                {parcel.dvf_prix_median_m2 ? `${parcel.dvf_prix_median_m2} €` : parcel.dvf_prix_m2_p50 ? `${parcel.dvf_prix_m2_p50.toFixed(0)} €` : '-'}
               </span>
             </div>
             <div className="flex justify-between text-xs">
@@ -1776,9 +1815,9 @@ function ParcelDetail({ parcel, projectType, onClose, onShowSiren }) {
 
         {/* Confidence */}
         <div className="flex items-center justify-between text-xs p-2" style={{ background: '#0a0a0f' }}>
-          <span style={{ color: '#8f8f9d' }}>Confiance</span>
-          <span className="font-mono" style={{ color: score.confidence_score > 70 ? '#00d4aa' : '#ffa502' }}>
-            {score.confidence_score?.toFixed(0) || 0}/100
+          <span style={{ color: '#8f8f9d' }}>Source</span>
+          <span className="font-mono" style={{ color: '#8f8f9d' }}>
+            {parcel.source === 'chat_assistant' ? 'Chatbot IA' : 'Carte IGN'}
           </span>
         </div>
       </div>
@@ -1805,6 +1844,21 @@ function ScoreBar({ label, value, max }) {
       <span className="w-10 text-right text-xs font-mono" style={{ color: '#e8e8ed' }}>
         {(value || 0).toFixed(0)}
       </span>
+    </div>
+  );
+}
+
+// Detail bar for score breakdown in ParcelDetail
+function DetailBar({ label, value, max }) {
+  const pct = max > 0 ? Math.min(100, (value || 0) / max * 100) : 0;
+  const color = pct >= 75 ? '#2ed573' : pct >= 50 ? '#ffa502' : pct >= 25 ? '#f0932b' : '#ff4757';
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-24 text-xs text-right" style={{ color: '#8f8f9d' }}>{label}</span>
+      <div className="flex-1 h-2 rounded-full" style={{ background: '#1f1f2e' }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span className="w-10 text-right text-xs font-mono" style={{ color }}>{value}/{max}</span>
     </div>
   );
 }
