@@ -24,28 +24,25 @@ Plateforme de prospection foncière pour data centers en France. Interface IA-Fi
 - [x] Distance cours d'eau + route (Overpass) + Suggestions chatbot + Street View/Satellite + Mode comparaison
 
 ### V4 Bugfixes agent IA
-- [x] BUG 1: Resume eau/route (recalcul post-Overpass)
-- [x] BUG 2: SYSTEM_PROMPT simplifié (actions obsolètes supprimées)
-- [x] BUG 3: Verdict cohérent après bonus 400kV
-- [x] BUG 4: Fallback sans LLM (_try_direct_parse)
-- [x] BUG 5: Reconstruction code_commune si vide
+- [x] 5 bugs corrigés (recalcul post-Overpass, SYSTEM_PROMPT, 400kV bonus, fallback sans LLM, code_commune)
 
 ### V5 Bugfixes pipeline (29/03/2026)
-- [x] **BUG CRITIQUE 1**: code_commune = dept(2) + com(3) = 5 chiffres (api_carto.py). Corrige fibre, georisques, DVF pour TOUTES les parcelles.
-- [x] **BUG CRITIQUE 2**: S3REnR matching par aliases manuels HTB→S3REnR (60+ correspondances PACA/IDF/HdF/AuRA) + fallback meilleur poste régional.
+- [x] code_commune 5 chiffres (api_carto.py) + S3REnR matching aliases manuels
 
 ### V6 Coordonnées RTE réelles (30/03/2026)
-- [x] **Remplacement postes HTB hardcodés** (101 approximatifs) par données OSM/Overpass réelles (3 569 postes ≥63kV)
-- [x] **Carte**: 1 091 postes ≥225kV affichés (au lieu de 101)
-- [x] **Distance**: 3 569 postes utilisés pour calculs de distance (précision améliorée)
-- [x] **Pipeline**: Script process_rte_data.py filtre France (polygone), normalise tensions, assigne régions par centre le plus proche
-- [x] **Tests**: 100% backend (11/11), 100% frontend — iteration_20
+- [x] 3 569 postes OSM/Overpass (distance) + 1 091 postes (carte) — remplace 101 hardcodés
 
-## Impact V6
-- Postes HTB carte: 101 → 1 091 (x10.8)
-- Postes HTB distance: 101 → 3 569 (x35.3)
-- Coordonnées GPS réelles (OpenStreetMap) vs approximations
-- Distances HTB plus précises pour le scoring
+### V7 — 5 Chantiers (30/03/2026)
+- [x] **Chantier 1**: Fix matching S3REnR — `_strip_accents()`, préfixes/suffixes stripping, 19 nouveaux alias (Aubette, Cap Janet, Weppes, etc.)
+- [x] **Chantier 1bis**: Fix heatmap MW — `_normalize()` avec accent stripping dans `server.py`
+- [x] **Chantier 2**: Données projet RTE Fos-Jonquières — ROQUEROUSSE & TAVEL ajoutés, `projet_fos` sur FEUILLANE/PONTEAU/REALTOR, FUTURE_LINE_METADATA enrichi, SYSTEM_PROMPT mis à jour
+- [x] **Chantier 3**: Fix export PDF — try/except, sécurisation None, `projet_fos` dans données clés et points forts
+- [x] **Chantier 4**: EmptyStatePanel — Recherche rapide (6 pills), Projet Fos card (3700/400/2029), Capacités réseau, KPIs infra, Guide, `externalChatMessage`
+- [x] **Chantier 5**: Projet Fos dans ParcelDetail + table de comparaison
+
+### Tests
+- [x] Iteration 20: 100% backend (11/11), 100% frontend — V6
+- [x] Iteration 21: 100% backend (15/15), 100% frontend — V7 (5 chantiers)
 
 ## Backlog
 - [ ] **P1**: Overlay risques Géorisques vectoriel sur carte
