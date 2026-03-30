@@ -7,7 +7,7 @@ Plateforme de prospection foncière pour data centers en France. Interface IA-Fi
 - **Backend**: FastAPI + MongoDB + Emergent LLM (GPT-4.1-mini)
 - **Frontend**: React + TailwindCSS + React-Leaflet + Shadcn/UI
 - **Auth**: Emergent Google Auth
-- **APIs externes**: IGN Carto, GPU Urbanisme, Géorisques, Geo API gouv.fr, DVF Cerema, Overpass OSM
+- **APIs externes**: IGN Carto, GPU Urbanisme, Géorisques, Geo API gouv.fr, DVF Cerema, Overpass OSM, api-adresse.data.gouv.fr
 
 ## Fonctionnalités implémentées
 
@@ -15,34 +15,34 @@ Plateforme de prospection foncière pour data centers en France. Interface IA-Fi
 - [x] Carte Leaflet dark + couches infra + Chatbot IA + Parcelles IGN + PLU GPU + S3REnR + Future 400kV + PDF + Google Auth
 
 ### V2 Refonte (29/03/2026)
-- [x] Score universel /100 (RTE/40, MW/30, PLU/20, Surface/10 + malus)
-- [x] Données réelles: S3REnR, fibre, Géorisques, DVF Cerema
-- [x] Recherche par commune + parallélisation + cache GPU + SYSTEM_PROMPT + Score breakdown + Agrégation adjacentes + PDF Fiche d'Opportunité
+- [x] Score universel /100 + Données réelles S3REnR/fibre/Géorisques/DVF + Recherche commune + PDF Fiche d'Opportunité
 
 ### V2-V3 Correctifs
-- [x] 5 couches carte + DVF cascade + Nettoyage project_type
-- [x] Distance cours d'eau + route (Overpass) + Suggestions chatbot + Street View/Satellite + Mode comparaison
+- [x] 5 couches carte + DVF cascade + Distance eau/route Overpass + Suggestions chatbot + Street View + Mode comparaison
 
-### V4 Bugfixes agent IA
-- [x] 5 bugs corrigés (recalcul post-Overpass, SYSTEM_PROMPT, 400kV bonus, fallback sans LLM, code_commune)
-
-### V5 Bugfixes pipeline (29/03/2026)
-- [x] code_commune 5 chiffres (api_carto.py) + S3REnR matching aliases manuels
+### V4-V5 Bugfixes
+- [x] 5 bugs agent IA + 2 bugs pipeline critiques (code_commune 5 digits, S3REnR aliases)
 
 ### V6 Coordonnées RTE réelles (30/03/2026)
-- [x] 3 569 postes OSM/Overpass (distance) + 1 091 postes (carte) — remplace 101 hardcodés
+- [x] 3 569 postes OSM/Overpass (distance) + 1 091 postes (carte)
 
 ### V7 — 5 Chantiers (30/03/2026)
-- [x] **Chantier 1**: Fix matching S3REnR — `_strip_accents()`, préfixes/suffixes stripping, 19 nouveaux alias (Aubette, Cap Janet, Weppes, etc.)
-- [x] **Chantier 1bis**: Fix heatmap MW — `_normalize()` avec accent stripping dans `server.py`
-- [x] **Chantier 2**: Données projet RTE Fos-Jonquières — ROQUEROUSSE & TAVEL ajoutés, `projet_fos` sur FEUILLANE/PONTEAU/REALTOR, FUTURE_LINE_METADATA enrichi, SYSTEM_PROMPT mis à jour
-- [x] **Chantier 3**: Fix export PDF — try/except, sécurisation None, `projet_fos` dans données clés et points forts
-- [x] **Chantier 4**: EmptyStatePanel — Recherche rapide (6 pills), Projet Fos card (3700/400/2029), Capacités réseau, KPIs infra, Guide, `externalChatMessage`
-- [x] **Chantier 5**: Projet Fos dans ParcelDetail + table de comparaison
+- [x] Fix S3REnR accents + heatmap MW + Projet RTE Fos-Jonquières + Fix PDF + EmptyStatePanel + projet_fos en frontend
+
+### V8 — Agent IA V3 (30/03/2026)
+- [x] **FIX 1**: Postes génériques sans nom → fallback régional best (plus de "inconnu" pour postes sans nom)
+- [x] **FIX 2**: Géocodage adresse via api-adresse.data.gouv.fr (httpx async)
+- [x] **ACTION analyze_parcel**: Analyse parcelle par référence cadastrale (IGN + enrichissement + score + budget)
+- [x] **ACTION find_by_address**: Géocode adresse → recherche parcelles autour (rayon configurable)
+- [x] **ACTION estimate_budget**: Estimation CAPEX/EBITDA/TRI indicatif (foncier + raccordement + construction + fibre)
+- [x] **SYSTEM_PROMPT V3**: 6 actions (find_parcels, analyze_parcel, find_by_address, estimate_budget, summary, chat) + mapping linguistique + contexte enrichi
+- [x] **_build_clean_parcel()**: Factorisation du nettoyage parcelle
+- [x] **Frontend**: Carte budget (CAPEX/EBITDA/TRI) dans ChatBot.js
+- [x] **_try_direct_parse()**: Fallback enrichi (regex cadastrale, adresse, budget)
 
 ### Tests
-- [x] Iteration 20: 100% backend (11/11), 100% frontend — V6
-- [x] Iteration 21: 100% backend (15/15), 100% frontend — V7 (5 chantiers)
+- [x] Iteration 20-21: 100% (V6-V7)
+- [x] Iteration 22: 91% backend (10/11, 1 transient 502), 100% frontend (V8)
 
 ## Backlog
 - [ ] **P1**: Overlay risques Géorisques vectoriel sur carte
