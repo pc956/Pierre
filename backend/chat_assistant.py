@@ -8,6 +8,7 @@ import json
 import math
 import asyncio
 import logging
+import unicodedata
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from emergentintegrations.llm.chat import LlmChat, UserMessage
@@ -68,6 +69,14 @@ HTB_TO_S3RENR_ALIASES = {
     "SALON DE PROVENCE": ["RASSUEN", "ROGNAC"],
     "MIRAMAS": ["RASSUEN", "LAVALDUC"],
     "PORT DE BOUC": ["PONTEAU", "LAVERA"],
+    # PACA — Noms OSM
+    "JONQUIERES": ["SORGUES", "PIOLENC", "BOLLENE"],
+    "SAINT CHAMAS": ["ST-CHAMAS"],
+    "AUBETTE": ["BERRE", "ROGNAC", "RASSUEN"],
+    "CABRIES": ["REALTOR", "LA DURANNE", "GARDANNE"],
+    "SEPTEMES": ["SAINT SAVOURNIN", "L'ESCARELLE"],
+    "CAP JANET": ["ARENC", "SAUMATY"],
+    "AIX MOURET": ["LA DURANNE", "GARDANNE"],
     # IDF
     "VILLEPINTE": ["VILLENEUVE-ST-GEORGES", "MITRY-MORY"],
     "ROISSY": ["MITRY-MORY"],
@@ -87,11 +96,28 @@ HTB_TO_S3RENR_ALIASES = {
     "ARRAS": ["GAVRELLE"],
     "AMIENS": ["ARGOEUVRES"],
     "BEAUVAIS": ["EPAUX-BEZU"],
+    # HdF — Noms OSM
+    "WEPPES": ["AVELIN", "GAVRELLE"],
+    "ARMENTIERES": ["AVELIN"],
+    "PIERRETTE": ["AVELIN"],
+    "LILLE DELIVRANCE": ["AVELIN"],
+    "SEQUEDIN": ["AVELIN"],
+    "AVELIN": ["AVELIN"],
+    "BERCLAU": ["GAVRELLE"],
+    "LESTARQUIT": ["GAVRELLE", "HORNAING"],
+    "VERTEFEUILLE": ["AVELIN"],
+    "ROUBAIX NORD": ["AVELIN"],
+    "SAINT ROCH": ["AVELIN"],
     # AuRA
     "LYON": ["GENISSIAT", "CUSSET"],
     "SAINT ETIENNE": ["PRATCLAUX"],
     "GRENOBLE": ["MONTEYNARD"],
 }
+
+
+def _strip_accents(s: str) -> str:
+    """é→e, è→e, ê→e, à→a, ù→u, etc."""
+    return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
 
 
 def get_s3renr_for_htb(nearest_htb_name: str, region: str) -> dict:
@@ -106,17 +132,19 @@ def get_s3renr_for_htb(nearest_htb_name: str, region: str) -> dict:
             return {"etat": "sature", "mw_dispo": 0, "renforcement": None, "score_dc": 1, "match_method": "region_sature"}
         return {"etat": "inconnu", "mw_dispo": 0, "renforcement": None, "score_dc": 5, "match_method": "no_postes"}
 
-    # 1. Normaliser le nom HTB
+    # 1. Normaliser le nom HTB (accents + préfixes + suffixes)
     norm = nearest_htb_name.upper()
-    for prefix in ["POSTE "]:
-        norm = norm.replace(prefix, "")
+    norm = _strip_accents(norm)
+    for prefix in ["POSTE ", "LA ", "LE ", "LES ", "L ", "D ", "DE ", "DES ", "DU "]:
+        if norm.startswith(prefix):
+            norm = norm[len(prefix):]
     for suffix in ["225KV", "400KV", "63KV", "150KV", "90KV"]:
         norm = norm.replace(suffix, "").strip()
     norm_htb = norm.replace("-", " ").replace("'", " ").strip()
 
-    # 2. Match direct par nom
+    # 2. Match direct par nom (avec accent stripping)
     for poste_name, poste_data in postes.items():
-        norm_s3 = poste_name.upper().replace("-", " ").replace("'", " ").strip()
+        norm_s3 = _strip_accents(poste_name.upper()).replace("-", " ").replace("'", " ").strip()
         if norm_s3 in norm_htb or norm_htb in norm_s3:
             return {
                 "etat": poste_data.get("etat", "inconnu"),
@@ -127,11 +155,12 @@ def get_s3renr_for_htb(nearest_htb_name: str, region: str) -> dict:
                 "match_poste": poste_name,
             }
 
-    # 3. Alias manuels
+    # 3. Alias manuels (avec normalisation accents)
     aliases = HTB_TO_S3RENR_ALIASES.get(norm_htb, [])
     if not aliases:
         for alias_key in HTB_TO_S3RENR_ALIASES:
-            if alias_key in norm_htb or norm_htb in alias_key:
+            norm_alias = _strip_accents(alias_key.upper()).replace("-", " ").replace("'", " ").strip()
+            if norm_alias in norm_htb or norm_htb in norm_alias:
                 aliases = HTB_TO_S3RENR_ALIASES[alias_key]
                 break
 
@@ -240,6 +269,12 @@ CONTEXTE:
 - PACA a ~6400 MW de capacité réseau, meilleur potentiel
 - HdF a ~2925 MW de capacité réseau
 - La future ligne 400kV Fos→Jonquières (PACA) sera un atout majeur
+- Le projet RTE Fos-Jonquières est le plus grand renforcement réseau en cours en France :
+  → Ligne aérienne 2 circuits 400kV Feuillane (Fos) — Jonquières (Gard), ~65 km
+  → +3700 MW de capacité (5600 MW avec CCG), investissement 400 M€ (1 milliard total)
+  → Mise en service 2029. Besoins régionaux : 7000 MW (quasi-doublement conso)
+  → 6 postes clés : Feuillane, Jonquières, Réaltor, Roquerousse, Ponteau, Tavel
+  → Alternatives écartées : souterrain (2200 M€, >2035), HVDC (>2035)
 - Les scores vont de 0 à 100 (GO ≥70, À ÉTUDIER 40-69, DÉFAVORABLE <40)
 """
 
@@ -344,6 +379,14 @@ async def _enrich_parcel(parsed: dict, infra: dict, params: dict) -> dict:
     parsed["renforcement_prevu"] = s3renr.get("renforcement")
     parsed["s3renr_match_method"] = s3renr.get("match_method", "")
     parsed["s3renr_match_poste"] = s3renr.get("match_poste", "")
+
+    # Propager projet Fos-Jonquières depuis S3REnR
+    matched_name = s3renr.get("match_poste", "")
+    if matched_name and not matched_name.startswith("~"):
+        from s3renr_data import S3RENR_DATA
+        poste_full = S3RENR_DATA.get(region, {}).get("postes", {}).get(matched_name, {})
+        if poste_full.get("projet_fos"):
+            parsed["projet_fos"] = poste_full["projet_fos"]
 
     # ── Fibre réelle (Étape 2B) ──
     code_commune = parsed.get("code_commune", "")
@@ -687,6 +730,7 @@ async def _find_real_parcels(params: dict) -> dict:
             "future_400kv_score_bonus": p.get("future_400kv_score_bonus", 0),
             "score": p.get("score", {}),
             "site_origin": p.get("site_origin", ""),
+            "projet_fos": p.get("projet_fos"),
         })
 
     return {

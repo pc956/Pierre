@@ -195,6 +195,10 @@ def compute_score_simple(parcel: dict) -> dict:
     if dist_route and dist_route < 2000:
         resume_parts.append(f"à {dist_route}m de {parcel.get('nom_route', 'axe routier')} ({parcel.get('type_route', '')})")
 
+    projet_fos = parcel.get("projet_fos")
+    if projet_fos:
+        resume_parts.append(f"Projet RTE Fos-Jonquières: {projet_fos}")
+
     if flags:
         risk_flags = [f for f in flags if "NON CONSTRUCTIBLE" not in f]
         if risk_flags:

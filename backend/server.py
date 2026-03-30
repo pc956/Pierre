@@ -475,11 +475,18 @@ _FRANCE_INFRA = get_all_france_infra()
 
 # ── S3REnR Enrichment: merge capacity data into HTB postes ──
 def _normalize(name):
-    """Normalize a poste name for fuzzy matching"""
+    """Normalize a poste name for fuzzy matching — with accent stripping"""
     import re
-    n = name.upper().replace("POSTE ", "").replace("-", " ").replace("'", " ")
+    import unicodedata
+    n = name.upper()
+    # Strip accents: Réaltor → REALTOR, Lavéra → LAVERA, Jonquières → JONQUIERES
+    n = ''.join(c for c in unicodedata.normalize('NFD', n) if unicodedata.category(c) != 'Mn')
+    n = n.replace("POSTE ", "").replace("-", " ").replace("'", " ")
+    # Strip common OSM prefixes
+    for prefix in ["LA ", "LE ", "LES ", "L ", "D ", "DE ", "DES ", "DU "]:
+        if n.startswith(prefix):
+            n = n[len(prefix):]
     n = re.sub(r'\d+KV', '', n).strip()
-    # Remove trailing numbers like "225" or "400"
     n = re.sub(r'\s+\d+$', '', n).strip()
     return n
 
@@ -825,26 +832,24 @@ async def get_dvf_region(region: str):
 async def export_parcel_pdf(parcel: Dict[str, Any]):
     """Generate a PDF fiche for a parcel or DC site"""
     from starlette.responses import Response
-    
-    # Get DVF data based on parcel info
-    code_insee = parcel.get("code_commune", "")
-    code_dep = parcel.get("code_dep", "")
-    dvf = None
-    if code_insee:
-        dvf = get_dvf_for_commune(code_insee)
-    elif code_dep:
-        dvf = get_dvf_for_commune(code_dep + "000")
-    
-    pdf_bytes = generate_parcel_pdf(parcel, dvf)
-    
-    commune = parcel.get("commune", parcel.get("name", "site"))
-    filename = f"cockpit_immo_{commune.replace(' ', '_')}.pdf"
-    
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
+    import traceback
+    try:
+        code_insee = parcel.get("code_commune", "")
+        code_dep = parcel.get("departement", "") or parcel.get("code_dep", "")
+        dvf = None
+        if code_insee:
+            dvf = get_dvf_for_commune(code_insee)
+        elif code_dep:
+            dvf = get_dvf_for_commune(code_dep + "000")
+        pdf_bytes = generate_parcel_pdf(parcel, dvf)
+        commune = parcel.get("commune") or parcel.get("name") or "site"
+        filename = f"cockpit_immo_{commune.replace(' ', '_')}.pdf"
+        return Response(content=pdf_bytes, media_type="application/pdf",
+                        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    except Exception as e:
+        import logging
+        logging.getLogger("server").error(f"PDF export error: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Erreur PDF: {str(e)}")
 
 
 @api_router.post("/export/pdf/dc-site")

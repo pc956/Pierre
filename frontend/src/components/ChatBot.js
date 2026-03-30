@@ -4,7 +4,7 @@ import axios from 'axios';
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
-export default function ChatBot({ onFlyTo, onHighlightSites, onSelectParcelFromChat }) {
+export default function ChatBot({ onFlyTo, onHighlightSites, onSelectParcelFromChat, externalMessage, onExternalMessageHandled }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
     { role: 'assistant', type: 'text', content: 'Bonjour ! Je suis votre assistant Cockpit Immo. Posez-moi une question sur les terrains pour data centers.\n\nExemples :\n• "Trouve 5 sites pour un DC de 50MW en PACA"\n• "Quels sont les postes non saturés dans le Nord ?"\n• "Résumé des capacités S3REnR"' }
@@ -26,6 +26,14 @@ export default function ChatBot({ onFlyTo, onHighlightSites, onSelectParcelFromC
       inputRef.current.focus();
     }
   }, [open]);
+
+  useEffect(() => {
+    if (externalMessage) {
+      setInput(externalMessage);
+      if (!open) setOpen(true);
+      onExternalMessageHandled && onExternalMessageHandled();
+    }
+  }, [externalMessage]);
 
   const sendMessage = async () => {
     const text = input.trim();

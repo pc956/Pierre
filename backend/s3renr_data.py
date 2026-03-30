@@ -50,7 +50,7 @@ S3RENR_DATA = {
             "LA GARDE": {"mw_reserve": 140, "mw_consomme": 5, "mw_dispo": 135, "etat": "disponible", "tension_kv": 225, "score_dc": 8},
             "TERRADOU": {"mw_reserve": 133, "mw_consomme": 13, "mw_dispo": 120, "etat": "disponible", "tension_kv": 225, "renforcement": "3ème TR 225/20kV (2032)", "score_dc": 8},
             "PLAN-D'ORGON": {"mw_reserve": 111, "mw_consomme": 10, "mw_dispo": 101, "etat": "disponible", "tension_kv": 225, "renforcement": "3ème TR 225/20kV (2032)", "score_dc": 8},
-            "REALTOR": {"mw_reserve": 107, "mw_consomme": 0, "mw_dispo": 107, "etat": "disponible", "tension_kv": 225, "score_dc": 8},
+            "REALTOR": {"mw_reserve": 107, "mw_consomme": 0, "mw_dispo": 107, "etat": "disponible", "tension_kv": 225, "score_dc": 8, "projet_fos": "Noeud réseau renforcé — transit 2x2500 MW, horizon 2029"},
             "LA DURANNE": {"mw_reserve": 102, "mw_consomme": 4, "mw_dispo": 98, "etat": "disponible", "tension_kv": 225, "score_dc": 7},
             "DIGUE-DES-FRANCAIS": {"mw_reserve": 99, "mw_consomme": 1, "mw_dispo": 98, "etat": "disponible", "tension_kv": 225, "score_dc": 7},
             "ROSANAIS": {"mw_reserve": 80, "mw_consomme": 0, "mw_dispo": 80, "etat": "disponible", "tension_kv": 225, "renforcement": "Création poste 225/20kV (2033)", "score_dc": 8},
@@ -59,7 +59,7 @@ S3RENR_DATA = {
             "BIANCON": {"mw_reserve": 80, "mw_consomme": 0, "mw_dispo": 80, "etat": "disponible", "tension_kv": 225, "renforcement": "Création poste 225/20kV (2033)", "score_dc": 7},
             "ALBION": {"mw_reserve": 80, "mw_consomme": 4, "mw_dispo": 76, "etat": "disponible", "tension_kv": 225, "renforcement": "Création poste 225/20kV (2030)", "score_dc": 7},
             "HAUT-VAR": {"mw_reserve": 160, "mw_consomme": 85, "mw_dispo": 75, "etat": "disponible", "tension_kv": 225, "renforcement": "Création poste source FOX-AMPHOUX 225/20kV (S2/2028)", "score_dc": 7},
-            "FEUILLANE": {"mw_reserve": 426, "mw_consomme": 352, "mw_dispo": 74, "etat": "disponible", "tension_kv": 225, "renforcement": "3ème TR + Création 225/20kV (2032-35)", "score_dc": 8},
+            "FEUILLANE": {"mw_reserve": 426, "mw_consomme": 352, "mw_dispo": 74, "etat": "disponible", "tension_kv": 225, "renforcement": "3ème TR + Création 225/20kV (2032-35)", "score_dc": 8, "projet_fos": "Hub central — départ nouvelle ligne 400kV, +3700 MW transit, horizon 2029"},
             "ENTREVAUX": {"mw_reserve": 80, "mw_consomme": 2, "mw_dispo": 78, "etat": "disponible", "tension_kv": 150, "renforcement": "Mutation TR 150/63kV (2033)", "score_dc": 7},
             "VALDEROURE": {"mw_reserve": 90, "mw_consomme": 18, "mw_dispo": 72, "etat": "disponible", "tension_kv": 225, "score_dc": 7},
             "CHATEAURENARD": {"mw_reserve": 73, "mw_consomme": 8, "mw_dispo": 65, "etat": "disponible", "renforcement": "Mutation TR 225/20kV 40→70MVA (2032)", "score_dc": 7},
@@ -111,6 +111,10 @@ S3RENR_DATA = {
             "LIMANS": {"mw_reserve": 22, "mw_consomme": 16, "mw_dispo": 7, "etat": "contraint", "renforcement": "3ème TR 63/20kV (existant)", "score_dc": 3},
             "CASTILLON": {"mw_reserve": 1, "mw_consomme": 1, "mw_dispo": 0, "etat": "sature", "score_dc": 0},
 
+            # POSTES PROJET FOS-JONQUIÈRES
+            "ROQUEROUSSE": {"mw_reserve": 50, "mw_consomme": 50, "mw_dispo": 0, "etat": "contraint", "tension_kv": 225, "score_dc": 4, "note": "Poste 225kV, noeud projet Fos-Jonquières", "projet_fos": "Noeud réseau 400kV — transit 2x2200 MW, horizon 2029"},
+            "TAVEL": {"mw_reserve": 100, "mw_consomme": 100, "mw_dispo": 0, "etat": "contraint", "tension_kv": 400, "score_dc": 4, "note": "Poste 400kV Gard, noeud amont projet Fos-Jonquières", "projet_fos": "Noeud amont 400kV — transit 2x2200 MW, horizon 2029"},
+
             # POSTES SATURÉS (0 MW)
             "BOLLENE": {"mw_reserve": 0, "mw_dispo": 0, "etat": "sature", "score_dc": 0},
             "BOUTRE": {"mw_reserve": 0, "mw_dispo": 0, "etat": "sature", "renforcement": "Ajout 3ème TR 400/225kV (S2/2025)", "score_dc": 2},
@@ -120,7 +124,7 @@ S3RENR_DATA = {
             "ORAISON": {"mw_reserve": 0, "mw_dispo": 0, "etat": "sature", "score_dc": 0},
             "VIDAUBAN": {"mw_reserve": 0, "mw_dispo": 0, "etat": "sature", "score_dc": 0},
             "LAVALDUC": {"mw_reserve": 0, "mw_dispo": 0, "etat": "sature", "score_dc": 0},
-            "PONTEAU": {"mw_reserve": 0, "mw_dispo": 0, "etat": "sature", "score_dc": 0},
+            "PONTEAU": {"mw_reserve": 0, "mw_dispo": 0, "etat": "sature", "score_dc": 0, "projet_fos": "Connexion ZIP Fos — transit 2x1300 MW, horizon 2029"},
             "NEOULES": {"mw_reserve": 0, "mw_dispo": 0, "etat": "sature", "score_dc": 0},
             "ST-CHAMAS": {"mw_reserve": 0, "mw_dispo": 0, "etat": "sature", "score_dc": 0},
         }

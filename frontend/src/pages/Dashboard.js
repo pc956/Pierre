@@ -185,6 +185,7 @@ export default function Dashboard() {
   const [mobilePanel, setMobilePanel] = useState(null); // 'filters' | 'layers' | 'detail' | null
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [chatFlyTarget, setChatFlyTarget] = useState(null);
+  const [externalChatMessage, setExternalChatMessage] = useState(null);
   
   // Map layers data
   const [landingPoints, setLandingPoints] = useState([]);
@@ -1025,109 +1026,12 @@ export default function Dashboard() {
                     compareList={compareList}
                   />
                 ) : (
-                  <div className="p-4">
-                    <h3 className="text-sm font-mono uppercase mb-4" style={{ color: '#8f8f9d' }}>
-                      Sélectionnez une parcelle
-                    </h3>
-                    <p className="text-xs" style={{ color: '#8f8f9d' }}>
-                      Cliquez sur un cercle sur la carte pour voir les détails de la parcelle.
-                    </p>
-                    
-                    {/* Legend */}
-                    <div className="mt-6 space-y-2">
-                      <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Légende</p>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-xs">
-                          <span style={{ width: 12, height: 12, background: '#ff4757', transform: 'rotate(45deg)', display: 'inline-block' }}></span>
-                          <span style={{ color: '#e8e8ed' }}>Poste 400kV</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs">
-                          <span style={{ width: 12, height: 12, background: '#ffa502', transform: 'rotate(45deg)', display: 'inline-block' }}></span>
-                          <span style={{ color: '#e8e8ed' }}>Poste 225kV</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs">
-                          <span style={{ width: 12, height: 12, background: '#3b82f6', transform: 'rotate(45deg)', display: 'inline-block' }}></span>
-                          <span style={{ color: '#e8e8ed' }}>Poste 63kV</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs">
-                          <span style={{ color: '#00d4aa', fontSize: 14 }}>⚓</span>
-                          <span style={{ color: '#e8e8ed' }}>Landing point</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs">
-                          <span style={{ width: 12, height: 12, background: '#8b5cf6', borderRadius: 2, display: 'inline-block' }}></span>
-                          <span style={{ color: '#e8e8ed' }}>DC existant</span>
-                        </div>
-                      </div>
-                      
-                      {/* S3REnR Legend */}
-                      <p className="text-xs font-mono uppercase mt-3" style={{ color: '#8f8f9d' }}>S3REnR (Capacités réseau)</p>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-xs">
-                          <span style={{ width: 12, height: 12, background: '#2ed573', transform: 'rotate(45deg)', display: 'inline-block' }}></span>
-                          <span style={{ color: '#2ed573' }}>Disponible</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs">
-                          <span style={{ width: 12, height: 12, background: '#ffa502', transform: 'rotate(45deg)', display: 'inline-block' }}></span>
-                          <span style={{ color: '#ffa502' }}>Contraint</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs">
-                          <span style={{ width: 12, height: 12, background: '#ff4757', transform: 'rotate(45deg)', display: 'inline-block' }}></span>
-                          <span style={{ color: '#ff4757' }}>Saturé</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Quick stats */}
-                    <div className="mt-6 space-y-3">
-                      <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Statistiques (filtrées)</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs" style={{ color: '#8f8f9d' }}>Sites GO</span>
-                        <span className="font-mono text-sm" style={{ color: '#00d4aa' }}>
-                          {filteredParcels.filter(p => p.score?.verdict === 'GO').length}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs" style={{ color: '#8f8f9d' }}>Sites À ÉTUDIER</span>
-                        <span className="font-mono text-sm" style={{ color: '#ffa502' }}>
-                          {filteredParcels.filter(p => p.score?.verdict === 'A_ETUDIER').length}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs" style={{ color: '#8f8f9d' }}>Sites DÉFAVORABLE</span>
-                        <span className="font-mono text-sm" style={{ color: '#ff4757' }}>
-                          {filteredParcels.filter(p => ['DEFAVORABLE', 'EXCLU'].includes(p.score?.verdict)).length}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {/* S3REnR Regional Summary */}
-                    {s3renrSummary.length > 0 && (
-                      <div className="mt-6 space-y-2" data-testid="s3renr-summary">
-                        <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>S3REnR — Capacités réseau</p>
-                        {s3renrSummary.map(region => (
-                          <div key={region.region} className="p-2 rounded" style={{ background: '#12121f', border: '1px solid #1e1e35' }}>
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs font-bold" style={{ color: '#e8e8ed' }}>{region.region}</span>
-                              <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ 
-                                background: region.status_global === 'SATURE' ? '#ff475722' : '#2ed57322',
-                                color: region.status_global === 'SATURE' ? '#ff4757' : '#2ed573',
-                              }}>
-                                {region.status_global}
-                              </span>
-                            </div>
-                            <div className="mt-1 text-xs" style={{ color: '#8f8f9d' }}>
-                              {region.mw_dispo_total} MW dispo · {region.nb_postes} postes
-                            </div>
-                            <div className="flex gap-2 mt-1 text-xs">
-                              <span style={{ color: '#2ed573' }}>{region.nb_disponibles} dispo</span>
-                              <span style={{ color: '#ffa502' }}>{region.nb_contraints} contr.</span>
-                              <span style={{ color: '#ff4757' }}>{region.nb_satures} sat.</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <EmptyStatePanel
+                    postes={postes}
+                    onSendChat={(query) => {
+                      setExternalChatMessage(query);
+                    }}
+                  />
                 )}
               </div>
               )}
@@ -1169,12 +1073,13 @@ export default function Dashboard() {
         onFlyTo={(lat, lng, zoom) => setChatFlyTarget({ lat, lng, zoom })}
         onHighlightSites={(ids) => { /* Future: highlight sites on map */ }}
         onSelectParcelFromChat={(parcel) => {
-          // Create a compatible parcel object for selection
           setSelectedParcel({
             ...parcel,
             source: 'chat_assistant',
           });
         }}
+        externalMessage={externalChatMessage}
+        onExternalMessageHandled={() => setExternalChatMessage(null)}
       />
 
       {/* SIREN Modal */}
@@ -1241,6 +1146,7 @@ export default function Dashboard() {
                     { label: 'Route', render: p => p.dist_route_m ? `${p.nom_route || '-'}: ${(p.dist_route_m/1000).toFixed(1)}km` : '-' },
                     { label: 'Fibre', render: p => p.dist_backbone_fibre_m ? `${(p.dist_backbone_fibre_m/1000).toFixed(1)} km` : '-' },
                     { label: 'Risques', render: p => (p.score?.flags || []).join(', ') || 'Aucun' },
+                    { label: 'Projet Fos', render: p => p.projet_fos || '-' },
                   ].map((row, ri) => (
                     <tr key={ri} style={{ borderBottom: '1px solid #1f1f2e08', background: ri % 2 === 0 ? '#12121a' : 'transparent' }}>
                       <td className="py-2 px-3" style={{ color: '#8f8f9d' }}>{row.label}</td>
@@ -1969,6 +1875,15 @@ function ParcelDetail({ parcel, onClose, onShowSiren, addToCompare, compareList 
           </div>
         )}
 
+        {/* Projet RTE Fos-Jonquières */}
+        {parcel.projet_fos && (
+          <div className="p-3 rounded mb-3" style={{ background: '#ff475712', border: '1px solid #ff475733' }} data-testid="projet-fos-panel">
+            <p className="text-xs font-mono uppercase font-bold mb-1" style={{ color: '#ff4757' }}>Projet RTE Fos-Jonquières</p>
+            <p className="text-xs" style={{ color: '#e8e8ed' }}>{parcel.projet_fos}</p>
+            <p className="text-[10px] mt-1 font-mono" style={{ color: '#ff475799' }}>+3700 MW · 400 M€ · Horizon 2029</p>
+          </div>
+        )}
+
         {/* Compare button */}
         {addToCompare && (
           <button
@@ -2012,14 +1927,29 @@ function ParcelDetail({ parcel, onClose, onShowSiren, addToCompare, compareList 
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(parcel),
               });
+              if (!res.ok) {
+                const errText = await res.text();
+                console.error('PDF error:', res.status, errText);
+                alert('Erreur lors de la génération du PDF.');
+                return;
+              }
               const blob = await res.blob();
+              if (blob.size < 100) {
+                alert('Le PDF généré est vide.');
+                return;
+              }
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
               a.download = `cockpit_immo_${parcel.commune || 'site'}.pdf`;
+              document.body.appendChild(a);
               a.click();
+              document.body.removeChild(a);
               URL.revokeObjectURL(url);
-            } catch (e) { console.error('PDF export error:', e); }
+            } catch (e) {
+              console.error('PDF export error:', e);
+              alert('Erreur réseau lors de l export PDF.');
+            }
           }}
           className="w-full flex items-center justify-center gap-2 py-2 text-xs font-mono uppercase rounded"
           style={{ background: '#00d4aa22', color: '#00d4aa', border: '1px solid #00d4aa33' }}
@@ -2080,3 +2010,113 @@ function DetailBar({ label, value, max }) {
 }
 
 // End of file
+
+function EmptyStatePanel({ postes, onSendChat }) {
+  const totalPostes = postes?.length || 0;
+
+  const quickSearches = [
+    { label: "PACA 2ha+", query: "Parcelles en PACA de 2 hectares minimum" },
+    { label: "Fos-sur-Mer", query: "Parcelles à Fos-sur-Mer pour data center" },
+    { label: "Hauts-de-France", query: "Parcelles en Hauts-de-France de 2 hectares minimum" },
+    { label: "Score > 70", query: "Parcelles avec un score supérieur à 70 en PACA" },
+    { label: "> 5 hectares", query: "Parcelles de 5 hectares minimum en France" },
+    { label: "Étang de Berre", query: "Parcelles de 3 hectares près de l étang de Berre" },
+  ];
+
+  return (
+    <div className="p-4 overflow-y-auto" style={{ maxHeight: '100%' }} data-testid="empty-state-panel">
+      <h3 className="text-sm font-mono uppercase mb-4" style={{ color: '#00d4aa' }}>Cockpit Immo</h3>
+
+      {/* Recherche rapide */}
+      <div className="mb-4" data-testid="quick-search-section">
+        <p className="text-[10px] font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>Recherche rapide</p>
+        <div className="flex flex-wrap gap-1.5">
+          {quickSearches.map((qs, i) => (
+            <button
+              key={i}
+              onClick={() => onSendChat && onSendChat(qs.query)}
+              className="px-2.5 py-1 text-[10px] font-mono rounded-full hover:opacity-80"
+              style={{ background: '#1f1f2e', border: '1px solid #2a2a3e', color: '#8f8f9d' }}
+              data-testid={`quick-search-${i}`}
+            >
+              {qs.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Projet Fos-Jonquières */}
+      <div className="p-3 rounded mb-4" style={{ background: '#ff475712', border: '1px solid #ff475733' }} data-testid="fos-project-card">
+        <p className="text-[10px] font-mono uppercase font-bold mb-1" style={{ color: '#ff4757' }}>Projet RTE Fos-Jonquières</p>
+        <p className="text-[10px]" style={{ color: '#e8e8ed' }}>Nouvelle ligne 400kV 2 circuits</p>
+        <p className="text-[9px]" style={{ color: '#8f8f9d' }}>Feuillane → Jonquières · ~65 km</p>
+        <div className="flex gap-3 mt-2">
+          <div className="text-center">
+            <p className="text-sm font-bold" style={{ color: '#ff4757' }}>3700</p>
+            <p className="text-[8px]" style={{ color: '#8f8f9d' }}>MW nouveaux</p>
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-bold" style={{ color: '#ffa502' }}>400</p>
+            <p className="text-[8px]" style={{ color: '#8f8f9d' }}>M€ invest.</p>
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-bold" style={{ color: '#00d4aa' }}>2029</p>
+            <p className="text-[8px]" style={{ color: '#8f8f9d' }}>horizon</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Capacités réseau */}
+      <div className="mb-4" data-testid="network-capacity-section">
+        <p className="text-[10px] font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>Capacités réseau</p>
+        {[
+          { name: 'PACA', mw: '3258 MW', pct: '52%', color: '#2ed573', desc: '76 postes · 52 dispo · 12 sat.' },
+          { name: 'Hauts-de-France', mw: '2925 MW', pct: '46%', color: '#2ed573', desc: '66 postes · 58 dispo · 5 sat.' },
+          { name: 'Île-de-France', mw: 'SATURÉ', pct: '100%', color: '#ff4757', desc: '10 postes · 0 dispo · 10 sat.' },
+        ].map((r, i) => (
+          <div key={i} className="p-2 rounded mb-1" style={{ background: '#0a0a0f', border: '1px solid #1e1e35' }}>
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-bold" style={{ color: '#e8e8ed' }}>{r.name}</span>
+              <span className="text-[10px] font-mono" style={{ color: r.color }}>{r.mw}</span>
+            </div>
+            <p className="text-[9px]" style={{ color: '#555' }}>{r.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Infrastructure KPIs */}
+      <div className="mb-4" data-testid="infra-kpis">
+        <p className="text-[10px] font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>Infrastructure</p>
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { val: totalPostes || 1091, label: 'Postes HTB', color: '#00d4aa' },
+            { val: 61, label: 'DC existants', color: '#3b82f6' },
+            { val: 8, label: 'Landing points', color: '#8b5cf6' },
+            { val: 49, label: 'Lignes THT', color: '#ffa502' },
+          ].map((k, i) => (
+            <div key={i} className="p-2 rounded text-center" style={{ background: '#0a0a0f', border: '1px solid #1e1e35' }}>
+              <p className="text-lg font-bold font-mono" style={{ color: k.color }}>{k.val}</p>
+              <p className="text-[8px]" style={{ color: '#8f8f9d' }}>{k.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Guide rapide */}
+      <div data-testid="quick-guide">
+        <p className="text-[10px] font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>Comment utiliser</p>
+        {[
+          "Cliquez sur un poste HTB puis \"Parcelles à 5km\"",
+          "Ou utilisez l'Assistant IA en bas à droite",
+          "Sélectionnez une parcelle pour voir le score",
+          "Comparez jusqu'à 3 parcelles côte-à-côte",
+          "Exportez la Fiche PDF pour vos clients",
+        ].map((step, i) => (
+          <p key={i} className="text-[10px] mb-1" style={{ color: '#8f8f9d' }}>
+            {i + 1}. {step}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}

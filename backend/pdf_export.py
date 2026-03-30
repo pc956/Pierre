@@ -107,30 +107,31 @@ def generate_parcel_pdf(parcel: dict, dvf_data: dict = None) -> bytes:
     s = _styles()
     elements = []
 
-    score_obj = parcel.get("score", {})
-    # Support both old format (score_net) and new format (score)
-    score_val = score_obj.get("score", score_obj.get("score_net", 0))
-    verdict = score_obj.get("verdict", "A_ETUDIER")
-    detail = score_obj.get("detail", {})
-    flags = score_obj.get("flags", [])
-    resume = score_obj.get("resume", "")
-
-    commune = parcel.get("commune", parcel.get("name", "N/A"))
-    region = parcel.get("region", parcel.get("location", {}).get("region", ""))
-    ref = parcel.get("ref_cadastrale", "")
-    surface_m2 = parcel.get("surface_m2", 0)
-    surface_ha = parcel.get("surface_ha", surface_m2 / 10000 if surface_m2 else 0)
-    dist_htb_m = parcel.get("dist_poste_htb_m", 0)
-    tension_kv = parcel.get("tension_htb_kv", 0)
-    htb_name = parcel.get("nearest_htb_name", "")
-    mw_dispo = parcel.get("mw_dispo", 0)
-    zone_sat = parcel.get("zone_saturation", "inconnu")
-    plu_zone = parcel.get("plu_zone", "inconnu")
-    plu_libelle = parcel.get("plu_libelle", "")
-    dvf_prix = parcel.get("dvf_prix_median_m2", 0)
-    renforcement = parcel.get("renforcement_prevu", "")
-    lat = parcel.get("latitude", parcel.get("location", {}).get("lat", 0))
-    lng = parcel.get("longitude", parcel.get("location", {}).get("lng", 0))
+    parcel = parcel or {}
+    score_obj = parcel.get("score") or {}
+    if isinstance(score_obj, (int, float)):
+        score_obj = {"score": int(score_obj), "verdict": "A_ETUDIER", "detail": {}, "flags": [], "resume": ""}
+    score_val = score_obj.get("score") or score_obj.get("score_net") or 0
+    verdict = score_obj.get("verdict") or "A_ETUDIER"
+    detail = score_obj.get("detail") or {}
+    flags = score_obj.get("flags") or []
+    resume = score_obj.get("resume") or ""
+    commune = parcel.get("commune") or parcel.get("name") or "N/A"
+    region = parcel.get("region") or ""
+    ref = parcel.get("ref_cadastrale") or ""
+    surface_m2 = parcel.get("surface_m2") or 0
+    surface_ha = parcel.get("surface_ha") or (surface_m2 / 10000 if surface_m2 else 0)
+    dist_htb = parcel.get("dist_poste_htb_m") or 0
+    tension_kv = parcel.get("tension_htb_kv") or 0
+    mw_dispo = parcel.get("mw_dispo") or 0
+    zone_sat = parcel.get("zone_saturation") or "inconnu"
+    plu_zone = parcel.get("plu_zone") or "inconnu"
+    plu_libelle = parcel.get("plu_libelle") or ""
+    dvf_prix = parcel.get("dvf_prix_median_m2") or 0
+    htb_name = parcel.get("nearest_htb_name") or "Poste HTB"
+    lat = parcel.get("latitude") or 0
+    lng = parcel.get("longitude") or 0
+    renforcement = parcel.get("renforcement_prevu")
 
     # ════════════════════════════════════════════
     # PAGE 1 — SYNTHÈSE DÉCISIONNELLE
@@ -169,7 +170,7 @@ def generate_parcel_pdf(parcel: dict, dvf_data: dict = None) -> bytes:
     elements.append(Paragraph("POURQUOI CE TERRAIN", s['section']))
     strong_points = []
     if detail.get("distance_rte", 0) >= 30:
-        strong_points.append(f"Seulement {dist_htb_m/1000:.1f} km du {htb_name} ({int(tension_kv)}kV)")
+        strong_points.append(f"Seulement {dist_htb/1000:.1f} km du {htb_name} ({int(tension_kv)}kV)")
     if detail.get("mw_disponibles", 0) >= 25:
         strong_points.append(f"{int(mw_dispo)} MW disponibles sur le réseau (statut: {zone_sat})")
     if detail.get("plu", 0) >= 15:
@@ -179,6 +180,9 @@ def generate_parcel_pdf(parcel: dict, dvf_data: dict = None) -> bytes:
         strong_points.append(f"Surface de {surface_ha:.1f} ha — adaptée pour un data center")
     if detail.get("malus", 0) == 0:
         strong_points.append("Aucun risque naturel ou réglementaire identifié")
+
+    if parcel.get("projet_fos"):
+        strong_points.append("Poste connecté au projet RTE Fos-Jonquières (+3700 MW, 2029)")
 
     if not strong_points:
         strong_points.append(resume or "Parcelle à analyser plus en détail")
@@ -194,7 +198,7 @@ def generate_parcel_pdf(parcel: dict, dvf_data: dict = None) -> bytes:
         ("Coordonnées GPS", f"{lat:.5f}, {lng:.5f}"),
         ("Surface", f"{surface_m2:,.0f} m² ({surface_ha:.2f} ha)"),
         ("Zone PLU", f"{plu_zone}" + (f" — {plu_libelle}" if plu_libelle else "")),
-        ("Poste RTE", f"{htb_name} ({int(tension_kv)}kV) à {dist_htb_m/1000:.1f} km"),
+        ("Poste RTE", f"{htb_name} ({int(tension_kv)}kV) à {dist_htb/1000:.1f} km"),
         ("MW disponibles", f"{int(mw_dispo)} MW (S3REnR: {zone_sat})"),
     ]
     if dvf_prix:
@@ -208,6 +212,9 @@ def generate_parcel_pdf(parcel: dict, dvf_data: dict = None) -> bytes:
     dist_route = parcel.get("dist_route_m")
     if dist_route:
         key_rows.append(("Route principale", f"{parcel.get('nom_route', 'Route')} ({parcel.get('type_route', '')}) à {dist_route/1000:.1f} km"))
+    projet_fos = parcel.get("projet_fos")
+    if projet_fos:
+        key_rows.append(("Projet RTE Fos-Jonquières", str(projet_fos)))
     elements.append(_data_table(key_rows))
     elements.append(Spacer(1, 2*mm))
 
@@ -246,7 +253,7 @@ def generate_parcel_pdf(parcel: dict, dvf_data: dict = None) -> bytes:
     foncier_meur = foncier_eur / 1_000_000 if foncier_eur else 0
 
     # Connection cost estimate
-    dist_km = dist_htb_m / 1000 if dist_htb_m else 5
+    dist_km = dist_htb / 1000 if dist_htb else 5
     if dist_km < 2 and zone_sat in ("disponible",):
         racc_low, racc_high = 0.3, 0.8
         racc_note = "0.3 à 0.8 M€/MW"

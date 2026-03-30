@@ -34,14 +34,27 @@ FUTURE_LINE_COORDINATES = [
 
 FUTURE_LINE_METADATA = {
     "id": "rte_400kv_future_fos_jonquieres",
-    "nom": "Future ligne RTE 400 kV Fos-sur-Mer → Jonquières",
-    "projet": "Renforcement réseau PACA — Projet Fos-Jonquières",
-    "mise_en_service_estimee": "~2029",
+    "nom": "Future ligne RTE 400kV Fos-sur-Mer (Feuillane) → Jonquières-Saint-Vincent",
+    "projet": "Restructuration alimentation électrique ZIP de Fos et Sud-Est",
+    "strategie": "Stratégie 10 — Ligne aérienne 2 circuits 400kV (retenue par RTE)",
+    "mise_en_service_estimee": "2029",
     "tension_kv": 400,
+    "nb_circuits": 2,
     "statut": "en_projet",
-    "description": "Projet RTE de renforcement du réseau 400 kV entre le poste de Feuillane (Fos-sur-Mer) et Jonquières-Saint-Vincent. Ce projet vise à sécuriser l'alimentation électrique de la zone industrialo-portuaire de Fos et à renforcer la capacité d'accueil pour les projets data center et industriels de la région PACA.",
-    "source": "Concertation publique RTE / Tracé approximatif",
-    "longueur_km_approx": 48,
+    "capacite_transit_nouvelle_mw": 3700,
+    "capacite_transit_avec_ccg_mw": 5600,
+    "besoins_totaux_region_mw": 7000,
+    "investissement_meur": 400,
+    "investissement_global_meur": 1000,
+    "longueur_km_approx": 65,
+    "postes_projet": ["FEUILLANE", "JONQUIERES", "REALTOR", "ROQUEROUSSE", "PONTEAU", "TAVEL"],
+    "strategies_ecartees": [
+        {"num": 1, "desc": "Souterrain 400kV AC", "cout_meur": 2200, "delai": ">2035", "raison": "Coût x5, délai +6 ans"},
+        {"num": 2, "desc": "Souterrain 225kV AC", "cout_meur": 1750, "delai": "2034", "raison": "48 câbles, impossible techniquement"},
+        {"num": 7, "desc": "HVDC souterrain", "delai": ">2035", "raison": "Technologie non mature"},
+        {"num": 12, "desc": "Quadruple circuit Tavel-Feuillane", "delai": "2034-2036", "raison": "Mode commun incendie"},
+    ],
+    "source": "RTE — Synthèse des stratégies fonctionnelles, novembre 2025",
 }
 
 # ═══════════════════════════════════════════════════════════
