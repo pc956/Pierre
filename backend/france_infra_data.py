@@ -1,163 +1,28 @@
 """
 Cockpit Immo - France Infrastructure Data
-Complete data for HTB substations, submarine cables, and data centers
+Complete data for HTB substations, submarine cables, and data centers.
+HTB substations loaded from real OSM/Overpass data (rte_postes_*.json).
 """
+import json
+import os
+
+_DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def _load_json(filename):
+    path = os.path.join(_DATA_DIR, filename)
+    if os.path.exists(path):
+        with open(path) as f:
+            return json.load(f)
+    return []
 
 # ═══════════════════════════════════════════════════════════════════
-# POSTES HTB FRANCE - Principales stations de transformation
-# Source: Approximation basée sur données RTE open data
+# POSTES HTB FRANCE - Loaded from real geographic data (OSM/Overpass)
+# rte_postes_map.json: ≥225kV postes for map display (~1000+)
+# rte_postes_all.json: all ≥63kV postes for distance calculations (~3500+)
 # ═══════════════════════════════════════════════════════════════════
 
-POSTES_HTB_FRANCE = [
-    # ═══════════════════════════════════════════
-    # ÎLE-DE-FRANCE (30 postes)
-    # ═══════════════════════════════════════════
-    {"asset_id": "htb_idf_001", "nom": "Poste Villepinte 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.55, 48.96]}, "tension_kv": 225, "puissance_mva": 400, "region": "IDF"},
-    {"asset_id": "htb_idf_002", "nom": "Poste Roissy 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.52, 49.01]}, "tension_kv": 225, "puissance_mva": 350, "region": "IDF"},
-    {"asset_id": "htb_idf_003", "nom": "Poste Gonesse 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.45, 48.98]}, "tension_kv": 400, "puissance_mva": 600, "region": "IDF"},
-    {"asset_id": "htb_idf_004", "nom": "Poste Cergy 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.06, 49.04]}, "tension_kv": 225, "puissance_mva": 300, "region": "IDF"},
-    {"asset_id": "htb_idf_005", "nom": "Poste Évry 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.44, 48.63]}, "tension_kv": 225, "puissance_mva": 280, "region": "IDF"},
-    {"asset_id": "htb_idf_006", "nom": "Poste Saint-Denis 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.36, 48.94]}, "tension_kv": 400, "puissance_mva": 600, "region": "IDF"},
-    {"asset_id": "htb_idf_007", "nom": "Poste Croissy-Beaubourg 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.65, 48.82]}, "tension_kv": 225, "puissance_mva": 350, "region": "IDF"},
-    {"asset_id": "htb_idf_008", "nom": "Poste Marne-la-Vallée 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.78, 48.85]}, "tension_kv": 225, "puissance_mva": 320, "region": "IDF"},
-    {"asset_id": "htb_idf_009", "nom": "Poste Poissy 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.03, 48.93]}, "tension_kv": 63, "puissance_mva": 150, "region": "IDF"},
-    {"asset_id": "htb_idf_010", "nom": "Poste Gennevilliers 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.29, 48.93]}, "tension_kv": 225, "puissance_mva": 380, "region": "IDF"},
-    {"asset_id": "htb_idf_011", "nom": "Poste La Courneuve 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.39, 48.92]}, "tension_kv": 225, "puissance_mva": 340, "region": "IDF"},
-    {"asset_id": "htb_idf_012", "nom": "Poste Aubervilliers 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.38, 48.91]}, "tension_kv": 63, "puissance_mva": 120, "region": "IDF"},
-    {"asset_id": "htb_idf_013", "nom": "Poste Tremblay 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.57, 48.95]}, "tension_kv": 400, "puissance_mva": 550, "region": "IDF"},
-    {"asset_id": "htb_idf_014", "nom": "Poste Meaux 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.88, 48.95]}, "tension_kv": 225, "puissance_mva": 280, "region": "IDF"},
-    {"asset_id": "htb_idf_015", "nom": "Poste Melun 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.66, 48.54]}, "tension_kv": 225, "puissance_mva": 260, "region": "IDF"},
-    {"asset_id": "htb_idf_016", "nom": "Poste Versailles 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.13, 48.80]}, "tension_kv": 225, "puissance_mva": 300, "region": "IDF"},
-    {"asset_id": "htb_idf_017", "nom": "Poste Nanterre 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.21, 48.89]}, "tension_kv": 225, "puissance_mva": 320, "region": "IDF"},
-    {"asset_id": "htb_idf_018", "nom": "Poste Boulogne 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.24, 48.84]}, "tension_kv": 63, "puissance_mva": 130, "region": "IDF"},
-    {"asset_id": "htb_idf_019", "nom": "Poste Montreuil 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.44, 48.86]}, "tension_kv": 63, "puissance_mva": 110, "region": "IDF"},
-    {"asset_id": "htb_idf_020", "nom": "Poste Vitry 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.39, 48.79]}, "tension_kv": 225, "puissance_mva": 290, "region": "IDF"},
-    
-    # ═══════════════════════════════════════════
-    # PACA (20 postes)
-    # ═══════════════════════════════════════════
-    {"asset_id": "htb_paca_001", "nom": "Poste Marseille Nord 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [5.38, 43.35]}, "tension_kv": 400, "puissance_mva": 600, "region": "PACA"},
-    {"asset_id": "htb_paca_002", "nom": "Poste Fos-sur-Mer 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [4.95, 43.45]}, "tension_kv": 400, "puissance_mva": 800, "region": "PACA"},
-    {"asset_id": "htb_paca_003", "nom": "Poste Vitrolles 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [5.25, 43.46]}, "tension_kv": 225, "puissance_mva": 320, "region": "PACA"},
-    {"asset_id": "htb_paca_004", "nom": "Poste Aix-en-Provence 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [5.45, 43.52]}, "tension_kv": 225, "puissance_mva": 280, "region": "PACA"},
-    {"asset_id": "htb_paca_005", "nom": "Poste Nice 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [7.26, 43.70]}, "tension_kv": 225, "puissance_mva": 350, "region": "PACA"},
-    {"asset_id": "htb_paca_006", "nom": "Poste Toulon 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [5.93, 43.12]}, "tension_kv": 225, "puissance_mva": 280, "region": "PACA"},
-    {"asset_id": "htb_paca_007", "nom": "Poste Cannes 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [7.01, 43.55]}, "tension_kv": 63, "puissance_mva": 120, "region": "PACA"},
-    {"asset_id": "htb_paca_008", "nom": "Poste Avignon 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [4.81, 43.95]}, "tension_kv": 400, "puissance_mva": 500, "region": "PACA"},
-    {"asset_id": "htb_paca_009", "nom": "Poste Marignane 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [5.21, 43.42]}, "tension_kv": 225, "puissance_mva": 260, "region": "PACA"},
-    {"asset_id": "htb_paca_010", "nom": "Poste Istres 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [4.98, 43.51]}, "tension_kv": 225, "puissance_mva": 300, "region": "PACA"},
-    
-    # ═══════════════════════════════════════════
-    # AUVERGNE-RHÔNE-ALPES (20 postes)
-    # ═══════════════════════════════════════════
-    {"asset_id": "htb_aura_001", "nom": "Poste Lyon Est 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [4.95, 45.74]}, "tension_kv": 400, "puissance_mva": 550, "region": "AuRA"},
-    {"asset_id": "htb_aura_002", "nom": "Poste Saint-Priest 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [4.94, 45.70]}, "tension_kv": 225, "puissance_mva": 320, "region": "AuRA"},
-    {"asset_id": "htb_aura_003", "nom": "Poste Vénissieux 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [4.88, 45.69]}, "tension_kv": 225, "puissance_mva": 280, "region": "AuRA"},
-    {"asset_id": "htb_aura_004", "nom": "Poste Grenoble 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [5.72, 45.19]}, "tension_kv": 225, "puissance_mva": 350, "region": "AuRA"},
-    {"asset_id": "htb_aura_005", "nom": "Poste Saint-Étienne 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [4.39, 45.44]}, "tension_kv": 225, "puissance_mva": 280, "region": "AuRA"},
-    {"asset_id": "htb_aura_006", "nom": "Poste Clermont-Ferrand 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [3.09, 45.78]}, "tension_kv": 225, "puissance_mva": 260, "region": "AuRA"},
-    {"asset_id": "htb_aura_007", "nom": "Poste Annecy 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [6.13, 45.90]}, "tension_kv": 225, "puissance_mva": 240, "region": "AuRA"},
-    {"asset_id": "htb_aura_008", "nom": "Poste Chambéry 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [5.92, 45.57]}, "tension_kv": 225, "puissance_mva": 220, "region": "AuRA"},
-    {"asset_id": "htb_aura_009", "nom": "Poste Valence 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [4.89, 44.93]}, "tension_kv": 225, "puissance_mva": 250, "region": "AuRA"},
-    {"asset_id": "htb_aura_010", "nom": "Poste Bourg-en-Bresse 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [5.23, 46.21]}, "tension_kv": 63, "puissance_mva": 130, "region": "AuRA"},
-    
-    # ═══════════════════════════════════════════
-    # HAUTS-DE-FRANCE (15 postes)
-    # ═══════════════════════════════════════════
-    {"asset_id": "htb_hdf_001", "nom": "Poste Lille Sud 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [3.08, 50.58]}, "tension_kv": 400, "puissance_mva": 500, "region": "HdF"},
-    {"asset_id": "htb_hdf_002", "nom": "Poste Dunkerque 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.38, 51.03]}, "tension_kv": 400, "puissance_mva": 700, "region": "HdF"},
-    {"asset_id": "htb_hdf_003", "nom": "Poste Calais 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [1.88, 50.94]}, "tension_kv": 225, "puissance_mva": 320, "region": "HdF"},
-    {"asset_id": "htb_hdf_004", "nom": "Poste Roubaix 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [3.18, 50.69]}, "tension_kv": 225, "puissance_mva": 280, "region": "HdF"},
-    {"asset_id": "htb_hdf_005", "nom": "Poste Valenciennes 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [3.52, 50.36]}, "tension_kv": 225, "puissance_mva": 260, "region": "HdF"},
-    {"asset_id": "htb_hdf_006", "nom": "Poste Amiens 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.30, 49.89]}, "tension_kv": 225, "puissance_mva": 280, "region": "HdF"},
-    {"asset_id": "htb_hdf_007", "nom": "Poste Douai 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [3.08, 50.37]}, "tension_kv": 225, "puissance_mva": 240, "region": "HdF"},
-    {"asset_id": "htb_hdf_008", "nom": "Poste Lens 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.83, 50.43]}, "tension_kv": 63, "puissance_mva": 120, "region": "HdF"},
-    {"asset_id": "htb_hdf_009", "nom": "Poste Compiègne 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.83, 49.42]}, "tension_kv": 225, "puissance_mva": 220, "region": "HdF"},
-    {"asset_id": "htb_hdf_010", "nom": "Poste Beauvais 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.08, 49.43]}, "tension_kv": 63, "puissance_mva": 110, "region": "HdF"},
-    
-    # ═══════════════════════════════════════════
-    # OCCITANIE (15 postes)
-    # ═══════════════════════════════════════════
-    {"asset_id": "htb_occ_001", "nom": "Poste Toulouse Blagnac 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [1.40, 43.64]}, "tension_kv": 400, "puissance_mva": 500, "region": "Occitanie"},
-    {"asset_id": "htb_occ_002", "nom": "Poste Montpellier 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [3.87, 43.61]}, "tension_kv": 225, "puissance_mva": 350, "region": "Occitanie"},
-    {"asset_id": "htb_occ_003", "nom": "Poste Perpignan 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.89, 42.70]}, "tension_kv": 225, "puissance_mva": 280, "region": "Occitanie"},
-    {"asset_id": "htb_occ_004", "nom": "Poste Nîmes 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [4.36, 43.84]}, "tension_kv": 225, "puissance_mva": 260, "region": "Occitanie"},
-    {"asset_id": "htb_occ_005", "nom": "Poste Béziers 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [3.22, 43.34]}, "tension_kv": 225, "puissance_mva": 220, "region": "Occitanie"},
-    {"asset_id": "htb_occ_006", "nom": "Poste Carcassonne 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.35, 43.21]}, "tension_kv": 63, "puissance_mva": 120, "region": "Occitanie"},
-    {"asset_id": "htb_occ_007", "nom": "Poste Albi 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.15, 43.93]}, "tension_kv": 63, "puissance_mva": 100, "region": "Occitanie"},
-    {"asset_id": "htb_occ_008", "nom": "Poste Tarbes 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [0.07, 43.23]}, "tension_kv": 225, "puissance_mva": 200, "region": "Occitanie"},
-    
-    # ═══════════════════════════════════════════
-    # NOUVELLE-AQUITAINE (15 postes)
-    # ═══════════════════════════════════════════
-    {"asset_id": "htb_naq_001", "nom": "Poste Bordeaux Nord 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-0.58, 44.87]}, "tension_kv": 400, "puissance_mva": 550, "region": "N-Aquitaine"},
-    {"asset_id": "htb_naq_002", "nom": "Poste La Rochelle 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-1.15, 46.16]}, "tension_kv": 225, "puissance_mva": 280, "region": "N-Aquitaine"},
-    {"asset_id": "htb_naq_003", "nom": "Poste Poitiers 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [0.34, 46.58]}, "tension_kv": 225, "puissance_mva": 260, "region": "N-Aquitaine"},
-    {"asset_id": "htb_naq_004", "nom": "Poste Limoges 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [1.26, 45.83]}, "tension_kv": 225, "puissance_mva": 240, "region": "N-Aquitaine"},
-    {"asset_id": "htb_naq_005", "nom": "Poste Angoulême 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [0.16, 45.65]}, "tension_kv": 63, "puissance_mva": 120, "region": "N-Aquitaine"},
-    {"asset_id": "htb_naq_006", "nom": "Poste Bayonne 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-1.47, 43.49]}, "tension_kv": 225, "puissance_mva": 220, "region": "N-Aquitaine"},
-    {"asset_id": "htb_naq_007", "nom": "Poste Pau 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-0.37, 43.30]}, "tension_kv": 225, "puissance_mva": 200, "region": "N-Aquitaine"},
-    {"asset_id": "htb_naq_008", "nom": "Poste Agen 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [0.62, 44.20]}, "tension_kv": 63, "puissance_mva": 100, "region": "N-Aquitaine"},
-    
-    # ═══════════════════════════════════════════
-    # GRAND EST (15 postes)
-    # ═══════════════════════════════════════════
-    {"asset_id": "htb_ges_001", "nom": "Poste Strasbourg 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [7.75, 48.58]}, "tension_kv": 400, "puissance_mva": 500, "region": "Grand Est"},
-    {"asset_id": "htb_ges_002", "nom": "Poste Mulhouse 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [7.34, 47.75]}, "tension_kv": 225, "puissance_mva": 300, "region": "Grand Est"},
-    {"asset_id": "htb_ges_003", "nom": "Poste Nancy 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [6.18, 48.69]}, "tension_kv": 225, "puissance_mva": 280, "region": "Grand Est"},
-    {"asset_id": "htb_ges_004", "nom": "Poste Metz 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [6.18, 49.12]}, "tension_kv": 400, "puissance_mva": 450, "region": "Grand Est"},
-    {"asset_id": "htb_ges_005", "nom": "Poste Reims 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [4.03, 49.25]}, "tension_kv": 225, "puissance_mva": 260, "region": "Grand Est"},
-    {"asset_id": "htb_ges_006", "nom": "Poste Troyes 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [4.07, 48.30]}, "tension_kv": 225, "puissance_mva": 220, "region": "Grand Est"},
-    {"asset_id": "htb_ges_007", "nom": "Poste Colmar 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [7.36, 48.08]}, "tension_kv": 63, "puissance_mva": 120, "region": "Grand Est"},
-    {"asset_id": "htb_ges_008", "nom": "Poste Charleville-Mézières 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [4.72, 49.77]}, "tension_kv": 63, "puissance_mva": 100, "region": "Grand Est"},
-    
-    # ═══════════════════════════════════════════
-    # PAYS DE LA LOIRE (10 postes)
-    # ═══════════════════════════════════════════
-    {"asset_id": "htb_pdl_001", "nom": "Poste Nantes 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-1.55, 47.22]}, "tension_kv": 400, "puissance_mva": 500, "region": "Pays de la Loire"},
-    {"asset_id": "htb_pdl_002", "nom": "Poste Le Mans 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [0.20, 48.00]}, "tension_kv": 225, "puissance_mva": 280, "region": "Pays de la Loire"},
-    {"asset_id": "htb_pdl_003", "nom": "Poste Angers 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-0.55, 47.47]}, "tension_kv": 225, "puissance_mva": 260, "region": "Pays de la Loire"},
-    {"asset_id": "htb_pdl_004", "nom": "Poste Saint-Nazaire 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-2.21, 47.28]}, "tension_kv": 225, "puissance_mva": 300, "region": "Pays de la Loire"},
-    {"asset_id": "htb_pdl_005", "nom": "Poste La Roche-sur-Yon 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-1.43, 46.67]}, "tension_kv": 63, "puissance_mva": 120, "region": "Pays de la Loire"},
-    
-    # ═══════════════════════════════════════════
-    # BRETAGNE (10 postes)
-    # ═══════════════════════════════════════════
-    {"asset_id": "htb_bzh_001", "nom": "Poste Rennes 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-1.68, 48.11]}, "tension_kv": 400, "puissance_mva": 450, "region": "Bretagne"},
-    {"asset_id": "htb_bzh_002", "nom": "Poste Brest 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-4.49, 48.39]}, "tension_kv": 225, "puissance_mva": 280, "region": "Bretagne"},
-    {"asset_id": "htb_bzh_003", "nom": "Poste Lorient 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-3.37, 47.75]}, "tension_kv": 225, "puissance_mva": 240, "region": "Bretagne"},
-    {"asset_id": "htb_bzh_004", "nom": "Poste Quimper 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-4.10, 47.99]}, "tension_kv": 225, "puissance_mva": 220, "region": "Bretagne"},
-    {"asset_id": "htb_bzh_005", "nom": "Poste Saint-Brieuc 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-2.76, 48.51]}, "tension_kv": 63, "puissance_mva": 120, "region": "Bretagne"},
-    {"asset_id": "htb_bzh_006", "nom": "Poste Vannes 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-2.76, 47.66]}, "tension_kv": 63, "puissance_mva": 100, "region": "Bretagne"},
-    
-    # ═══════════════════════════════════════════
-    # NORMANDIE (10 postes)
-    # ═══════════════════════════════════════════
-    {"asset_id": "htb_nor_001", "nom": "Poste Rouen 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [1.09, 49.44]}, "tension_kv": 400, "puissance_mva": 500, "region": "Normandie"},
-    {"asset_id": "htb_nor_002", "nom": "Poste Le Havre 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [0.12, 49.49]}, "tension_kv": 400, "puissance_mva": 450, "region": "Normandie"},
-    {"asset_id": "htb_nor_003", "nom": "Poste Caen 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-0.37, 49.18]}, "tension_kv": 225, "puissance_mva": 280, "region": "Normandie"},
-    {"asset_id": "htb_nor_004", "nom": "Poste Cherbourg 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [-1.62, 49.64]}, "tension_kv": 225, "puissance_mva": 260, "region": "Normandie"},
-    {"asset_id": "htb_nor_005", "nom": "Poste Évreux 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [1.15, 49.02]}, "tension_kv": 63, "puissance_mva": 120, "region": "Normandie"},
-    {"asset_id": "htb_nor_006", "nom": "Poste Dieppe 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [1.08, 49.93]}, "tension_kv": 63, "puissance_mva": 100, "region": "Normandie"},
-    
-    # ═══════════════════════════════════════════
-    # CENTRE-VAL DE LOIRE (8 postes)
-    # ═══════════════════════════════════════════
-    {"asset_id": "htb_cvl_001", "nom": "Poste Orléans 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [1.91, 47.90]}, "tension_kv": 400, "puissance_mva": 450, "region": "Centre-VdL"},
-    {"asset_id": "htb_cvl_002", "nom": "Poste Tours 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [0.69, 47.39]}, "tension_kv": 225, "puissance_mva": 280, "region": "Centre-VdL"},
-    {"asset_id": "htb_cvl_003", "nom": "Poste Bourges 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [2.40, 47.08]}, "tension_kv": 225, "puissance_mva": 240, "region": "Centre-VdL"},
-    {"asset_id": "htb_cvl_004", "nom": "Poste Chartres 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [1.49, 48.46]}, "tension_kv": 63, "puissance_mva": 120, "region": "Centre-VdL"},
-    {"asset_id": "htb_cvl_005", "nom": "Poste Blois 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [1.33, 47.59]}, "tension_kv": 63, "puissance_mva": 100, "region": "Centre-VdL"},
-    
-    # ═══════════════════════════════════════════
-    # BOURGOGNE-FRANCHE-COMTÉ (8 postes)
-    # ═══════════════════════════════════════════
-    {"asset_id": "htb_bfc_001", "nom": "Poste Dijon 400kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [5.04, 47.32]}, "tension_kv": 400, "puissance_mva": 450, "region": "Bourgogne-FC"},
-    {"asset_id": "htb_bfc_002", "nom": "Poste Besançon 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [6.02, 47.24]}, "tension_kv": 225, "puissance_mva": 280, "region": "Bourgogne-FC"},
-    {"asset_id": "htb_bfc_003", "nom": "Poste Belfort 225kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [6.86, 47.64]}, "tension_kv": 225, "puissance_mva": 260, "region": "Bourgogne-FC"},
-    {"asset_id": "htb_bfc_004", "nom": "Poste Auxerre 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [3.57, 47.80]}, "tension_kv": 63, "puissance_mva": 120, "region": "Bourgogne-FC"},
-    {"asset_id": "htb_bfc_005", "nom": "Poste Chalon-sur-Saône 63kV", "type": "poste_htb", "geometry": {"type": "Point", "coordinates": [4.85, 46.78]}, "tension_kv": 63, "puissance_mva": 100, "region": "Bourgogne-FC"},
-]
+POSTES_HTB_FRANCE = _load_json("rte_postes_map.json")
+POSTES_HTB_ALL = _load_json("rte_postes_all.json")
 
 # ═══════════════════════════════════════════════════════════════════
 # CÂBLES SOUS-MARINS - Tous les câbles atterrissant en France
@@ -496,9 +361,13 @@ LIGNES_225KV_FRANCE = [
 
 
 def get_all_france_infra():
-    """Get all France infrastructure data"""
+    """Get all France infrastructure data.
+    postes_htb: major substations (≥225kV) for map display
+    postes_htb_all: all substations (≥63kV) for distance calculations
+    """
     return {
         "postes_htb": POSTES_HTB_FRANCE,
+        "postes_htb_all": POSTES_HTB_ALL if POSTES_HTB_ALL else POSTES_HTB_FRANCE,
         "lignes_400kv": LIGNES_400KV_FRANCE,
         "lignes_225kv": LIGNES_225KV_FRANCE,
         "submarine_cables": SUBMARINE_CABLES_FRANCE,

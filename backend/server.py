@@ -1004,7 +1004,7 @@ async def get_commune_parcelles(code_insee: str, section: Optional[str] = None):
             min_dist_htb = 999999
             nearest_htb_kv = 0
             nearest_htb_name = ""
-            for htb in _FRANCE_INFRA["postes_htb"]:
+            for htb in _FRANCE_INFRA["postes_htb_all"]:
                 hcoords = htb["geometry"]["coordinates"]
                 dist = _haversine(plon, plat, hcoords[0], hcoords[1])
                 if dist < min_dist_htb:
@@ -1127,7 +1127,7 @@ async def get_bbox_parcelles(
             # Find nearest HTB post
             min_dist_htb = 999999
             nearest_htb_kv = 0
-            for htb in _FRANCE_INFRA["postes_htb"]:
+            for htb in _FRANCE_INFRA["postes_htb_all"]:
                 hcoords = htb["geometry"]["coordinates"]
                 dist = _haversine(plon, plat, hcoords[0], hcoords[1])
                 if dist < min_dist_htb:

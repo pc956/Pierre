@@ -301,7 +301,8 @@ async def _enrich_parcel(parsed: dict, infra: dict, params: dict) -> dict:
     min_dist_htb = 999999
     nearest_htb_kv = 0
     nearest_htb_name = ""
-    for htb in infra["postes_htb"]:
+    htb_list = infra.get("postes_htb_all") or infra["postes_htb"]
+    for htb in htb_list:
         hcoords = htb["geometry"]["coordinates"]
         dist = _haversine(plon, plat, hcoords[0], hcoords[1])
         if dist < min_dist_htb:
@@ -477,7 +478,8 @@ async def _find_real_parcels(params: dict) -> dict:
         if commune_info and commune_info["lat"] and commune_info["lng"]:
             # Find HTB substations near the commune center
             htb_near = []
-            for htb in infra["postes_htb"]:
+            htb_list_commune = infra.get("postes_htb_all") or infra["postes_htb"]
+            for htb in htb_list_commune:
                 hcoords = htb["geometry"]["coordinates"]
                 dist = _haversine(commune_info["lng"], commune_info["lat"], hcoords[0], hcoords[1])
                 if dist <= max_dist_htb_m * 1.5:
