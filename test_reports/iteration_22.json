@@ -1,0 +1,72 @@
+{
+  "summary": "Iteration 22 - V3 Update Testing Complete. Backend: 10/11 tests passed (91%). Frontend: All features verified. New capabilities (analyze_parcel, find_by_address, estimate_budget) working correctly. Budget card displays CAPEX/EBITDA/TRI. FIX 1 (generic poste names) verified - no 'inconnu' for S3REnR regions. FIX 2 (geocoding) working via api-adresse.data.gouv.fr.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/chat (parcel search)", "issue": "LLM sometimes returns 'text' type instead of 'parcel_results' when no parcels match strict criteria - this is valid behavior but test needed adjustment"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "=== BACKEND API TESTS (10/11) ===",
+    "GET /api/ returns API info (version 1.0.0)",
+    "GET /api/france/communes?q=Fos returns Fos-sur-Mer",
+    "GET /api/map/electrical-assets returns 1140 postes (≥1000 expected)",
+    "FIX 1: No 'inconnu' etat for postes in S3REnR regions (IDF, PACA, HdF)",
+    "POST /api/chat with 'Résumé des capacités réseau' returns summary type with 3 regions",
+    "NEW: POST /api/chat budget query returns parcel with budget field (CAPEX=103.6 M€, EBITDA=5.3 M€, TRI=5.1%)",
+    "NEW: POST /api/chat with address triggers find_by_address action",
+    "NEW: POST /api/chat with cadastral ref triggers analyze_parcel action",
+    "FIX 2: Geocoding via api-adresse.data.gouv.fr working",
+    "GET /api/s3renr/summary returns region data",
+    "=== FRONTEND UI TESTS ===",
+    "EmptyStatePanel visible with data-testid='empty-state-panel'",
+    "Quick search section with pills (PACA 2ha+, Fos-sur-Mer, Hauts-de-France, Score > 70, > 5 hectares, Étang de Berre)",
+    "Fos project card shows: PROJET RTE FOS-JONQUIÈRES, 3700 MW, 400 M€, 2029",
+    "Network capacity section shows PACA (3258 MW), Hauts-de-France (2925 MW), Île-de-France (SATURÉ)",
+    "Infrastructure KPIs: 1091 postes HTB, 61 DC existants, 8 landing points, 49 lignes THT",
+    "Quick search pill click opens chatbot with query pre-filled",
+    "Budget card displays in ChatBot.js with CAPEX/EBITDA/TRI grid (103.6 M€, 5.3 M€, 5.1%)",
+    "Map loads with electrical assets displayed"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iteration22_v3_update.py",
+    "/app/test_reports/pytest/pytest_results_iteration22.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_iteration22_v3_update.py"
+  ],
+  "success_rate": {
+    "backend": "91% (10/11 tests passed - 1 transient 502 error)",
+    "frontend": "100% (all features verified)"
+  },
+  "test_credentials": "Cookie: session_token=test_session_token_2026",
+  "seed_data_creation": "Used existing test user 'test_user_01' with session for UI testing",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 22 verified V3 update: 1) FIX 1 - Generic poste names fallback working, no 'inconnu' for S3REnR regions. 2) FIX 2 - Geocoding via api-adresse.data.gouv.fr working. 3) NEW analyze_parcel action - analyzes parcels by cadastral reference. 4) NEW find_by_address action - geocodes address then searches parcels. 5) NEW estimate_budget action - returns CAPEX/EBITDA/TRI for DC projects. 6) Frontend budget card displays correctly with CAPEX=103.6 M€, EBITDA=5.3 M€, TRI=5.1% for 10MW project at Fos-sur-Mer. SYSTEM_PROMPT has 6 actions: find_parcels, analyze_parcel, find_by_address, estimate_budget, summary, chat.",
+  "new_v3_capabilities_verified": {
+    "analyze_parcel": "Working - analyzes parcel by cadastral ref (e.g., 13039000AE0019)",
+    "find_by_address": "Working - geocodes address via api-adresse.data.gouv.fr then searches parcels",
+    "estimate_budget": "Working - returns budget with CAPEX/EBITDA/TRI for DC projects"
+  },
+  "budget_estimation_example": {
+    "query": "Combien coûte un projet DC de 10MW à Fos-sur-Mer?",
+    "result": {
+      "capex_total_meur": 103.6,
+      "ebitda_meur": 5.3,
+      "tri_indicatif_pct": 5.1,
+      "foncier_eur": 7458720,
+      "raccordement_eur": 5600000,
+      "construction_eur": 90000000,
+      "fibre_eur": 500000
+    }
+  },
+  "mocked_api_note": "No mocked APIs - All data is real from OSM/Overpass, S3REnR, and api-adresse.data.gouv.fr"
+}

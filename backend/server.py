@@ -488,6 +488,9 @@ def _normalize(name):
             n = n[len(prefix):]
     n = re.sub(r'\d+KV', '', n).strip()
     n = re.sub(r'\s+\d+$', '', n).strip()
+    # Postes génériques sans vrai nom → ne pas matcher
+    if not n or len(n) < 2:
+        return "__GENERIC_NO_MATCH__"
     return n
 
 # Region mapping: france_infra_data region -> S3REnR region key

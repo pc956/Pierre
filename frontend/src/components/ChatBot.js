@@ -534,6 +534,35 @@ function ChatMessage({ msg, onSiteClick, onParcelClick }) {
                       </span>
                     )}
                   </div>
+
+                  {/* Budget estimation */}
+                  {p.budget && (
+                    <div className="mt-1.5 p-1.5 rounded" style={{ background: '#0a0a0f', border: '1px solid #1f1f2e' }} data-testid={`parcel-budget-${i}`}>
+                      <p className="text-[9px] font-mono uppercase font-bold mb-1" style={{ color: '#00d4aa' }}>
+                        Budget indicatif — {p.budget.mw_target} MW
+                      </p>
+                      <div className="grid grid-cols-3 gap-1 text-[9px]">
+                        <div className="text-center">
+                          <p className="font-bold" style={{ color: '#ffa502' }}>{p.budget.capex_total_meur} M€</p>
+                          <p style={{ color: '#555' }}>CAPEX</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="font-bold" style={{ color: '#2ed573' }}>{p.budget.ebitda_meur} M€</p>
+                          <p style={{ color: '#555' }}>EBITDA/an</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="font-bold" style={{ color: '#00d4aa' }}>{p.budget.tri_indicatif_pct}%</p>
+                          <p style={{ color: '#555' }}>TRI ind.</p>
+                        </div>
+                      </div>
+                      <div className="mt-1 flex flex-wrap gap-1 text-[8px]" style={{ color: '#555' }}>
+                        <span>Foncier: {(p.budget.foncier_eur / 1e6).toFixed(1)}M€</span>
+                        <span>Racc.: {(p.budget.raccordement_eur / 1e6).toFixed(1)}M€</span>
+                        <span>Constr.: {(p.budget.construction_eur / 1e6).toFixed(1)}M€</span>
+                        <span>Fibre: {(p.budget.fibre_eur / 1e6).toFixed(1)}M€</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
