@@ -32,12 +32,20 @@ Plateforme de prospection foncière pour data centers en France. Interface IA-Fi
 
 ### V5 Bugfixes pipeline (29/03/2026)
 - [x] **BUG CRITIQUE 1**: code_commune = dept(2) + com(3) = 5 chiffres (api_carto.py). Corrige fibre, georisques, DVF pour TOUTES les parcelles.
-- [x] **BUG CRITIQUE 2**: S3REnR matching par aliases manuels HTB→S3REnR (60+ correspondances PACA/IDF/HdF/AuRA) + fallback meilleur poste régional. Champs s3renr_match_method + s3renr_match_poste exposés.
+- [x] **BUG CRITIQUE 2**: S3REnR matching par aliases manuels HTB→S3REnR (60+ correspondances PACA/IDF/HdF/AuRA) + fallback meilleur poste régional.
 
-## Impact des fixes V5
-- Scores passent de ~75 à **83-95/100** grâce aux vrais MW S3REnR
-- Fibre estimée correctement (500m-1500m vs 3000m fallback)
-- Resume contient "avec 74 MW disponibles" au lieu de silence
+### V6 Coordonnées RTE réelles (30/03/2026)
+- [x] **Remplacement postes HTB hardcodés** (101 approximatifs) par données OSM/Overpass réelles (3 569 postes ≥63kV)
+- [x] **Carte**: 1 091 postes ≥225kV affichés (au lieu de 101)
+- [x] **Distance**: 3 569 postes utilisés pour calculs de distance (précision améliorée)
+- [x] **Pipeline**: Script process_rte_data.py filtre France (polygone), normalise tensions, assigne régions par centre le plus proche
+- [x] **Tests**: 100% backend (11/11), 100% frontend — iteration_20
+
+## Impact V6
+- Postes HTB carte: 101 → 1 091 (x10.8)
+- Postes HTB distance: 101 → 3 569 (x35.3)
+- Coordonnées GPS réelles (OpenStreetMap) vs approximations
+- Distances HTB plus précises pour le scoring
 
 ## Backlog
 - [ ] **P1**: Overlay risques Géorisques vectoriel sur carte
