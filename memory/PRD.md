@@ -11,41 +11,31 @@ Plateforme de prospection foncière pour data centers en France. Interface IA-Fi
 
 ## Fonctionnalités implémentées
 
-### V1 MVP
-- [x] Carte Leaflet dark + couches infra + Chatbot IA + Parcelles IGN + PLU GPU + S3REnR + Future 400kV + PDF + Google Auth
-
-### V2 Refonte (29/03/2026)
-- [x] Score universel /100 + Données réelles S3REnR/fibre/Géorisques/DVF + Recherche commune + PDF Fiche d'Opportunité
-
-### V2-V3 Correctifs
-- [x] 5 couches carte + DVF cascade + Distance eau/route Overpass + Suggestions chatbot + Street View + Mode comparaison
-
-### V4-V5 Bugfixes
-- [x] 5 bugs agent IA + 2 bugs pipeline critiques (code_commune 5 digits, S3REnR aliases)
-
-### V6 Coordonnées RTE réelles (30/03/2026)
-- [x] 3 569 postes OSM/Overpass (distance) + 1 091 postes (carte)
-
-### V7 — 5 Chantiers (30/03/2026)
-- [x] Fix S3REnR accents + heatmap MW + Projet RTE Fos-Jonquières + Fix PDF + EmptyStatePanel + projet_fos en frontend
+### V1-V7 (29-30/03/2026)
+- [x] MVP complet + Refonte scoring + Correctifs + Bugfixes + RTE réel + 5 Chantiers Fos
 
 ### V8 — Agent IA V3 (30/03/2026)
-- [x] **FIX 1**: Postes génériques sans nom → fallback régional best (plus de "inconnu" pour postes sans nom)
-- [x] **FIX 2**: Géocodage adresse via api-adresse.data.gouv.fr (httpx async)
-- [x] **ACTION analyze_parcel**: Analyse parcelle par référence cadastrale (IGN + enrichissement + score + budget)
-- [x] **ACTION find_by_address**: Géocode adresse → recherche parcelles autour (rayon configurable)
-- [x] **ACTION estimate_budget**: Estimation CAPEX/EBITDA/TRI indicatif (foncier + raccordement + construction + fibre)
-- [x] **SYSTEM_PROMPT V3**: 6 actions (find_parcels, analyze_parcel, find_by_address, estimate_budget, summary, chat) + mapping linguistique + contexte enrichi
-- [x] **_build_clean_parcel()**: Factorisation du nettoyage parcelle
-- [x] **Frontend**: Carte budget (CAPEX/EBITDA/TRI) dans ChatBot.js
-- [x] **_try_direct_parse()**: Fallback enrichi (regex cadastrale, adresse, budget)
+- [x] 3 nouvelles actions (analyze_parcel, find_by_address, estimate_budget) + SYSTEM_PROMPT V3 + budget CAPEX/EBITDA/TRI
+
+### V9 — DC 10 MW (01/04/2026)
+- [x] **Scoring V3**: 5 axes normalisés /100 (Distance RTE /35, MW S3REnR /25, PLU /20, Surface /10, TTM Raccordement /10) + malus
+- [x] **TTM (Time-to-Market)**: Délai raccordement estimé (12-48 mois) calculé automatiquement
+- [x] **Scan DC 10 MW**: `GET /api/scan/dc-10mw` — scan auto postes RTE ≥10 MW, IGN parcelles en parallèle, scoring instantané
+- [x] **Scan par poste**: `GET /api/scan/around-poste/{name}` — scan parcelles autour d'un poste spécifique
+- [x] **S3REnR étendu**: 8 régions (IDF, PACA, HdF, OCC, AuRA, GES, NAQ + estimations ETF)
+- [x] **Frontend Scan**: Bouton "Scan DC 10MW" + section Scan Automatique (5 régions) + résultats triés par score
+- [x] **Frontend TTM**: Badge délai raccordement dans fiche parcelle + panneau "Raccordement 10 MW"
+- [x] **Frontend Score V3**: 5 barres détail (Distance RTE, MW dispo, PLU, Surface, Raccordement)
+- [x] **Fix PLU matching**: Filter souple (U matche UI/UX/UE et inversement)
+- [x] **Fix timeout chat**: Pre-filter surface avant enrichissement, timeout Overpass, max 3 sites/région
 
 ### Tests
-- [x] Iteration 20-21: 100% (V6-V7)
-- [x] Iteration 22: 91% backend (10/11, 1 transient 502), 100% frontend (V8)
+- [x] Iteration 23: 100% backend (8/8), 100% frontend — V9
 
 ## Backlog
 - [ ] **P1**: Overlay risques Géorisques vectoriel sur carte
 - [ ] **P2**: Mode COMEX (vue exécutive)
 - [ ] **P2**: Alertes automatiques
+- [ ] **P2**: Filtres recherche avancés (sliders puissance/délai/distance)
 - [ ] **P3**: PDF comparatifs auto
+- [ ] **P3**: fibre_data.py données réelles NRO ARCEP
