@@ -343,9 +343,20 @@ def parse_parcelle_feature(feature: Dict[str, Any]) -> Dict[str, Any]:
         h = hashlib.md5(geom_str.encode()).hexdigest()[:12]
         parcel_id = f"fr_g{h}"
     
+    # Référence cadastrale normalisée (14 caractères: commune + prefixe + section + numero)
+    com_abs = props.get("com_abs", "000") or "000"
+    ref_cadastrale = idu or f"{code_commune}{com_abs}{section}{numero}".strip()
+
+    # URLs externes Pappers Immo
+    pappers_immo_url = f"https://immobilier.pappers.fr/?q={ref_cadastrale}" if ref_cadastrale else None
+    lat_val = centroid["coordinates"][1] if centroid else 0
+    lon_val = centroid["coordinates"][0] if centroid else 0
+    pappers_map_url = f"https://immobilier.pappers.fr/#18/{lat_val}/{lon_val}" if lat_val and lon_val else None
+    cadastre_gouv_url = "https://www.cadastre.gouv.fr/scpc/rechercherParReferenceCadastrale.do" if ref_cadastrale else None
+
     return {
         "parcel_id": parcel_id,
-        "ref_cadastrale": idu or f"{code_commune}{section}{numero}",
+        "ref_cadastrale": ref_cadastrale,
         "code_commune": code_commune,
         "commune": props.get("nom_com", ""),
         "departement": code_dep,
@@ -355,13 +366,18 @@ def parse_parcelle_feature(feature: Dict[str, Any]) -> Dict[str, Any]:
         "centroid": centroid,
         "surface_m2": surface_m2,
         "surface_ha": surface_m2 / 10000 if surface_m2 else 0,
-        "latitude": centroid["coordinates"][1] if centroid else 0,
-        "longitude": centroid["coordinates"][0] if centroid else 0,
+        "latitude": lat_val,
+        "longitude": lon_val,
         
         # Section cadastrale
         "section": section,
         "numero": numero,
         "feuille": feuille,
+        
+        # Liens externes
+        "pappers_immo_url": pappers_immo_url,
+        "pappers_map_url": pappers_map_url,
+        "cadastre_gouv_url": cadastre_gouv_url,
         
         # Source
         "source": "api_carto_ign",

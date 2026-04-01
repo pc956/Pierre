@@ -267,8 +267,8 @@ Paramètres:
 - max_surface_ha: surface maximum (null = pas de max)
 - max_dist_htb_km: distance max au poste HTB en km (défaut: 5)
 - plu_zones: zones PLU acceptées (null = toutes). ["UI","UX","UE"] pour industriel.
-- nb_parcels: nombre max de résultats (défaut: 10, max: 20)
-- search_radius_m: rayon en mètres (défaut: 2000, max: 5000)
+- nb_parcels: nombre max de résultats (défaut: 30, max: 50)
+- search_radius_m: rayon en mètres (défaut: 5000, max: 10000)
 
 2. action: "analyze_parcel" — ANALYSER UNE PARCELLE PAR RÉFÉRENCE
 Utilise quand l'utilisateur donne un numéro de parcelle cadastrale.
@@ -300,6 +300,17 @@ Utilise quand l'utilisateur demande une vue d'ensemble nationale.
 - response: ta réponse en texte libre
 Utilise pour les questions marché, réglementation, conseils, ou conversation.
 
+7. action: "scan_region" — SCAN AUTOMATIQUE MULTI-POSTES
+Utilise quand l'utilisateur veut trouver les meilleurs terrains dans une région entière,
+ou quand il dit "scanne la région", "trouve-moi tout", "montre-moi toutes les opportunités".
+C'est l'action LA PLUS PUISSANTE — elle scanne autour de TOUS les postes RTE avec de la capacité.
+Paramètres:
+- region: code région (obligatoire) "IDF"|"PACA"|"HdF"|"AuRA"|"BRE"|"GES"|"NOR"|"NAQ"|"OCC"|"PDL"
+- mw_min: MW minimum disponibles au poste (défaut: 10)
+- max_dist_poste_km: distance max parcelle-poste (défaut: 5)
+- min_surface_ha: surface minimum (défaut: 0.5)
+- max_results: nombre total max de résultats (défaut: 50)
+
 MAPPING LINGUISTIQUE:
 - "Paris", "Île-de-France", "IDF" → region: "IDF"
 - "Marseille", "PACA", "sud", "Provence", "Fos" → region: "PACA"
@@ -311,17 +322,54 @@ MAPPING LINGUISTIQUE:
 - "combien coûte", "budget", "CAPEX", "estimation financière" → action: "estimate_budget"
 - "résumé", "vue d'ensemble", "capacités réseau" → action: "summary"
 - "zone industrielle", "UI" → plu_zones: ["UI", "UX", "UE", "I", "IX"]
+- "scanne tout", "toutes les parcelles", "scan complet", "scan région" → action: "scan_region"
+- "montre-moi les opportunités", "quels terrains" → action: "scan_region" si région mentionnée
+- "scan multi-postes", "scan automatique" → action: "scan_region"
+- Pour "scan_region": {"action": "scan_region", "params": {...}, "intro": "texte"}
 
 RÈGLES CRITIQUES:
 - Si l'utilisateur donne un numéro qui ressemble à une ref cadastrale (5+ chiffres + lettres + chiffres) → "analyze_parcel"
 - Si l'utilisateur donne une adresse avec numéro + rue + code postal → "find_by_address"
 - Si l'utilisateur mentionne un lieu/commune sans adresse précise → "find_parcels" avec commune
+- Si l'utilisateur veut scanner une région entière → "scan_region"
 - TOUJOURS répondre en JSON valide uniquement
 - Pour "find_parcels": {"action": "find_parcels", "params": {...}, "intro": "texte"}
 - Pour "analyze_parcel": {"action": "analyze_parcel", "params": {"ref": "...", "mw_target": 10}, "intro": "texte"}
 - Pour "find_by_address": {"action": "find_by_address", "params": {"address": "...", ...}, "intro": "texte"}
 - Pour "estimate_budget": {"action": "estimate_budget", "params": {"ref": "...", "mw_target": 10}, "intro": "texte"}
+- Pour "scan_region": {"action": "scan_region", "params": {"region": "...", ...}, "intro": "texte"}
 - Pour "chat": {"action": "chat", "response": "ta réponse"}
+
+STRATÉGIE DE RECHERCHE MULTI-NIVEAUX:
+Quand l'utilisateur cherche des parcelles, TOUJOURS procéder en entonnoir:
+
+Niveau 1 — Si l'utilisateur donne une commune précise:
+  → Utiliser "find_parcels" avec la commune
+  → nb_parcels: 30 par défaut pour maximiser les résultats
+  → Si l'utilisateur semble chercher beaucoup de résultats, augmenter search_radius_m à 8000-10000
+
+Niveau 2 — Si l'utilisateur donne une région:
+  → Utiliser "scan_region" pour scanner TOUS les postes de la région
+  → Présenter les résultats groupés par poste RTE
+  → Mettre en avant les "clusters" (zones avec plusieurs parcelles proches)
+
+Niveau 3 — Si aucun résultat satisfaisant:
+  → Proposer d'élargir aux régions voisines
+  → Proposer de baisser les critères (surface, distance)
+  → Expliquer POURQUOI il n'y a pas de résultat (réseau saturé? PLU incompatible?)
+
+TOUJOURS PROPOSER PLUS:
+- Ne JAMAIS retourner moins de 5 parcelles si la base de données en contient plus
+- Toujours trier par score décroissant
+- Toujours mentionner le poste RTE associé, les MW dispo, et le TTM estimé
+- Signaler les "pépites" (score > 70) avec un commentaire spécial
+
+LIENS PROPRIÉTAIRE:
+Quand tu retournes des parcelles, TOUJOURS inclure le champ "pappers_immo_url" dans les résultats.
+Quand l'utilisateur demande "qui est le propriétaire" ou "contact du propriétaire":
+1. Fournir le lien Pappers Immo de la parcelle
+2. Expliquer que Pappers montre les propriétaires personnes morales (SCI, sociétés) gratuitement
+3. Pour les personnes physiques, recommander la publicité foncière ou un notaire
 
 CONTEXTE:
 - IDF est SATURÉ (0 MW disponible, 10 postes tous saturés)
@@ -646,6 +694,9 @@ def _build_clean_parcel(p: dict) -> dict:
         "score": p.get("score", {}),
         "site_origin": p.get("site_origin", ""),
         "code_commune": p.get("code_commune", ""),
+        "pappers_immo_url": p.get("pappers_immo_url"),
+        "pappers_map_url": p.get("pappers_map_url"),
+        "cadastre_gouv_url": p.get("cadastre_gouv_url"),
     }
 
 
@@ -659,9 +710,9 @@ async def _find_real_parcels(params: dict) -> dict:
     infra = get_all_france_infra()
 
     commune_name = params.get("commune")
-    search_radius = min(params.get("search_radius_m", 2000), 5000)
+    search_radius = min(params.get("search_radius_m", 5000), 10000)
     min_surface_ha = params.get("min_surface_ha", 1.0)
-    nb_parcels_max = min(params.get("nb_parcels", 10), 20)
+    nb_parcels_max = min(params.get("nb_parcels", 30), 50)
     max_dist_htb_m = params.get("max_dist_htb_km", 5) * 1000
 
     # ── ÉTAPE 3: Recherche par commune ──
@@ -719,7 +770,7 @@ async def _find_real_parcels(params: dict) -> dict:
     effective_radius = max(search_radius, int(max_dist_htb_m * 1.2), 2500)
     if min_surface_ha >= 3:
         effective_radius = max(effective_radius, 4000)
-    effective_radius = min(effective_radius, 5000)
+    effective_radius = min(effective_radius, 10000)
 
     # Limit sites to avoid timeout (max 3 for region-wide, 5 for commune)
     max_sites = 5 if commune_name else 3
@@ -796,6 +847,54 @@ async def _find_real_parcels(params: dict) -> dict:
         if pid not in seen:
             seen.add(pid)
             unique_parcels.append(p)
+
+    # ── P3: Auto-widen if < 5 results ──
+    if len(unique_parcels) < 5 and effective_radius < 10000:
+        wider_radius = min(effective_radius * 2, 10000)
+        logger.info(f"Auto-widen: {len(unique_parcels)} parcels found, expanding radius {effective_radius}m → {wider_radius}m")
+
+        async def _search_site_wider(site):
+            lat = site["location"]["lat"]
+            lng = site["location"]["lng"]
+            site_name = site.get("name", "")
+            try:
+                data = await asyncio.wait_for(
+                    get_parcelles_around_point(lng, lat, radius_m=wider_radius, limit=120),
+                    timeout=12
+                )
+                return site_name, site, data.get("features", [])
+            except Exception:
+                return site_name, site, []
+
+        wider_results = await asyncio.gather(*[_search_site_wider(s) for s in top_sites])
+        for site_name, site, features in wider_results:
+            wider_params = {**params, "min_surface_ha": min_surface_ha * 0.5}
+            parsed_extra = []
+            for feature in features:
+                p = parse_parcelle_feature(feature)
+                if p.get("centroid"):
+                    surface_ha = (p.get("surface_m2") or 0) / 10000
+                    if surface_ha < min_surface_ha * 0.5:
+                        continue
+                    p["site_origin"] = site_name
+                    parsed_extra.append(p)
+            parsed_extra.sort(key=lambda x: -(x.get("surface_m2") or 0))
+            parsed_extra = parsed_extra[:20]
+            for i in range(0, len(parsed_extra), 10):
+                batch = parsed_extra[i:i+10]
+                try:
+                    enriched = await asyncio.wait_for(
+                        asyncio.gather(*[_enrich_parcel(p, infra, wider_params) for p in batch]),
+                        timeout=15
+                    )
+                except asyncio.TimeoutError:
+                    enriched = []
+                for ep in enriched:
+                    if ep is not None and ep["parcel_id"] not in seen:
+                        seen.add(ep["parcel_id"])
+                        unique_parcels.append(ep)
+
+        unique_parcels.sort(key=lambda p: -(p.get("score", {}).get("score", 0)))
 
     # ── ÉTAPE 9: Agrégation parcelles adjacentes ──
     composite_sites = _aggregate_adjacent(unique_parcels)
@@ -1025,8 +1124,8 @@ async def _find_parcels_near_address(address: str, params: dict) -> dict:
         return {"parcels": [], "message": f"Adresse '{address}' non trouvée. Essayez avec le nom de la commune."}
 
     infra = get_all_france_infra()
-    search_radius = min(params.get("search_radius_m", 3000), 5000)
-    nb_parcels_max = min(params.get("nb_parcels", 10), 20)
+    search_radius = min(params.get("search_radius_m", 5000), 10000)
+    nb_parcels_max = min(params.get("nb_parcels", 30), 50)
 
     try:
         data = await get_parcelles_around_point(geo["lng"], geo["lat"], radius_m=search_radius, limit=120)
@@ -1131,6 +1230,230 @@ def _estimate_dc_budget(parcel: dict, mw_target: int = 10) -> dict:
         "ebitda_meur": round(ebitda_annuel / 1e6, 1),
         "tri_indicatif_pct": round((ebitda_annuel / capex_total) * 100, 1) if capex_total > 0 else 0,
         "note": "Estimation indicative — pas un conseil financier. Consulter un bureau d'études spécialisé.",
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# SCAN REGION — Multi-postes RTE (P2)
+# ═══════════════════════════════════════════════════════════
+
+async def _handle_scan_region(params: dict) -> dict:
+    """Scan all parcels around top RTE substations in a region.
+    Starts from S3REnR postes with capacity, finds matching HTB coordinates,
+    then searches parcels around each. Deduplicates results."""
+    from s3renr_data import S3RENR_DATA
+
+    region = params.get("region", "PACA")
+    mw_min = params.get("mw_min", 10)
+    max_dist_km = params.get("max_dist_poste_km", 5)
+    min_surface_ha = params.get("min_surface_ha", 0.5)
+    max_results = min(params.get("max_results", 50), 50)
+
+    infra = get_all_france_infra()
+    htb_list = infra.get("postes_htb_all") or infra["postes_htb"]
+    region_data = S3RENR_DATA.get(region, {})
+    postes_s3renr = region_data.get("postes", {})
+
+    if not postes_s3renr:
+        return {
+            "parcels": [],
+            "groups": [],
+            "total_found": 0,
+            "returned": 0,
+            "postes_scanned": 0,
+            "postes_with_results": 0,
+            "eligible_postes_count": 0,
+            "region": region,
+            "message": f"Aucune donnée S3REnR pour la région {region}.",
+        }
+
+    # Step 1: Get S3REnR postes with sufficient MW
+    eligible_s3renr = []
+    for poste_name, poste_data in postes_s3renr.items():
+        mw = poste_data.get("mw_dispo", 0)
+        if mw >= mw_min:
+            eligible_s3renr.append({"name": poste_name, "mw_dispo": mw, "data": poste_data})
+    eligible_s3renr.sort(key=lambda x: -x["mw_dispo"])
+    eligible_s3renr = eligible_s3renr[:15]
+
+    if not eligible_s3renr:
+        return {
+            "parcels": [],
+            "groups": [],
+            "total_found": 0,
+            "returned": 0,
+            "postes_scanned": 0,
+            "postes_with_results": 0,
+            "eligible_postes_count": 0,
+            "region": region,
+            "message": f"Aucun poste S3REnR avec >= {mw_min} MW dans la région {region}.",
+        }
+
+    # Step 2: Match S3REnR postes to HTB coordinates
+    eligible = []
+    for s3 in eligible_s3renr:
+        s3_name_norm = _strip_accents(s3["name"].upper()).replace("-", " ").replace("'", " ").strip()
+        best_htb = None
+        best_dist_score = 999
+
+        for htb in htb_list:
+            htb_name = htb.get("nom", "")
+            htb_norm = _strip_accents(htb_name.upper()).replace("-", " ").replace("'", " ").strip()
+            # Remove voltage suffixes
+            for suffix in ["225KV", "400KV", "63KV", "150KV", "90KV"]:
+                htb_norm = htb_norm.replace(suffix, "").strip()
+            for prefix in ["POSTE ", "LA ", "LE ", "LES ", "L ", "D ", "DE ", "DES ", "DU "]:
+                if htb_norm.startswith(prefix):
+                    htb_norm = htb_norm[len(prefix):]
+
+            # Name matching score
+            if s3_name_norm == htb_norm:
+                best_htb = htb
+                best_dist_score = 0
+                break
+            elif s3_name_norm in htb_norm or htb_norm in s3_name_norm:
+                score = abs(len(s3_name_norm) - len(htb_norm))
+                if score < best_dist_score:
+                    best_dist_score = score
+                    best_htb = htb
+
+        if best_htb:
+            coords = best_htb["geometry"]["coordinates"]
+            eligible.append({
+                "name": s3["name"],
+                "lng": coords[0],
+                "lat": coords[1],
+                "mw_dispo": s3["mw_dispo"],
+                "htb_name": best_htb.get("nom", ""),
+            })
+
+    if not eligible:
+        # Fallback: use alias mapping to find coordinates
+        for s3 in eligible_s3renr[:5]:
+            aliases = HTB_TO_S3RENR_ALIASES
+            for alias_key, alias_list in aliases.items():
+                if s3["name"].upper() in [a.upper() for a in alias_list]:
+                    # Find the HTB with this alias key name
+                    alias_norm = _strip_accents(alias_key.upper())
+                    for htb in htb_list:
+                        htb_norm = _strip_accents(htb.get("nom", "").upper()).replace("-", " ")
+                        if alias_norm in htb_norm:
+                            coords = htb["geometry"]["coordinates"]
+                            eligible.append({
+                                "name": s3["name"],
+                                "lng": coords[0],
+                                "lat": coords[1],
+                                "mw_dispo": s3["mw_dispo"],
+                                "htb_name": htb.get("nom", ""),
+                            })
+                            break
+                    if eligible:
+                        break
+
+    if not eligible:
+        return {
+            "parcels": [],
+            "groups": [],
+            "total_found": 0,
+            "returned": 0,
+            "postes_scanned": 0,
+            "postes_with_results": 0,
+            "eligible_postes_count": len(eligible_s3renr),
+            "region": region,
+            "message": f"Impossible de localiser les postes S3REnR de la région {region} dans les données HTB.",
+        }
+
+    # Step 3: Search parcels around each substation in parallel
+    radius_m = max_dist_km * 1000
+
+    async def _scan_around_poste(poste_info):
+        try:
+            data = await asyncio.wait_for(
+                get_parcelles_around_point(poste_info["lng"], poste_info["lat"], radius_m=radius_m, limit=100),
+                timeout=12
+            )
+            features = data.get("features", [])
+            parsed = []
+            for f in features:
+                p = parse_parcelle_feature(f)
+                if p.get("centroid"):
+                    s_ha = (p.get("surface_m2") or 0) / 10000
+                    if s_ha >= min_surface_ha * 0.8:
+                        p["site_origin"] = f"scan_region:{poste_info['name']}"
+                        parsed.append(p)
+            parsed.sort(key=lambda x: -(x.get("surface_m2") or 0))
+            return poste_info["name"], parsed[:20]
+        except Exception as e:
+            logger.warning(f"scan_region error for {poste_info['name']}: {e}")
+            return poste_info["name"], []
+
+    scan_results = await asyncio.gather(*[_scan_around_poste(p) for p in eligible])
+
+    # Step 4: Deduplicate by parcel_id
+    seen = set()
+    all_parsed = []
+    postes_scanned = 0
+    postes_with_results = 0
+    for poste_name, parsed_list in scan_results:
+        postes_scanned += 1
+        if parsed_list:
+            postes_with_results += 1
+        for p in parsed_list:
+            pid = p["parcel_id"]
+            if pid not in seen:
+                seen.add(pid)
+                all_parsed.append(p)
+
+    # Step 5: Enrich parcels in parallel (batches of 10, max 80 total)
+    all_parsed = all_parsed[:80]
+    enriched_all = []
+    enrich_params = {
+        "min_surface_ha": min_surface_ha,
+        "max_dist_htb_km": max_dist_km,
+        "max_surface_ha": None,
+    }
+    for i in range(0, len(all_parsed), 10):
+        batch = all_parsed[i:i+10]
+        try:
+            enriched = await asyncio.wait_for(
+                asyncio.gather(*[_enrich_parcel(p, infra, enrich_params) for p in batch]),
+                timeout=18
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"scan_region enrichment timeout batch {i}")
+            enriched = []
+        for ep in enriched:
+            if ep is not None:
+                enriched_all.append(ep)
+
+    # Sort by score desc
+    enriched_all.sort(key=lambda p: -(p.get("score", {}).get("score", 0)))
+
+    # Deduplicate again after enrichment
+    seen2 = set()
+    unique = []
+    for p in enriched_all:
+        pid = p["parcel_id"]
+        if pid not in seen2:
+            seen2.add(pid)
+            unique.append(p)
+
+    # Group adjacent parcels
+    groups = _aggregate_adjacent(unique)
+
+    # Take top results
+    final = unique[:max_results]
+    clean = [_build_clean_parcel(p) for p in final]
+
+    return {
+        "parcels": clean,
+        "groups": groups,
+        "total_found": len(unique),
+        "returned": len(clean),
+        "postes_scanned": postes_scanned,
+        "postes_with_results": postes_with_results,
+        "eligible_postes_count": len(eligible_s3renr),
+        "region": region,
     }
 
 
@@ -1351,6 +1674,39 @@ async def process_chat_message(
                 logger.error(f"estimate_budget error: {e}")
                 return {"type": "error", "text": f"Erreur lors de l'estimation budget: {str(e)}"}
 
+        elif action == "scan_region":
+            params = parsed.get("params", {})
+            region = params.get("region", "")
+            if not region:
+                return {"type": "text", "text": "Merci de préciser la région à scanner (PACA, HdF, AuRA, IDF, etc.)."}
+            try:
+                result = await _handle_scan_region(params)
+                parcels = result.get("parcels", [])
+                if not parcels:
+                    msg = result.get("message", f"Aucune parcelle trouvée dans la région {region}.")
+                    return {"type": "text", "text": intro + "\n\n" + msg}
+                lats = [p["latitude"] for p in parcels if p["latitude"]]
+                lngs = [p["longitude"] for p in parcels if p["longitude"]]
+                fly_to = {
+                    "lat": sum(lats) / len(lats) if lats else 46.6,
+                    "lng": sum(lngs) / len(lngs) if lngs else 2.3,
+                    "zoom": 9,
+                }
+                return {
+                    "type": "parcel_results",
+                    "intro": intro + f"\n\nScan terminé: {result['postes_scanned']} postes RTE scannés, {result['postes_with_results']} avec résultats.",
+                    "parcels": parcels,
+                    "composite_sites": result.get("groups", []),
+                    "sites_searched": [{"name": f"Scan {region}", "type": "scan_region", "postes_scanned": result["postes_scanned"]}],
+                    "total_found": result["total_found"],
+                    "returned": result["returned"],
+                    "fly_to": fly_to,
+                    "params": params,
+                }
+            except Exception as e:
+                logger.error(f"scan_region error: {e}")
+                return {"type": "error", "text": f"Erreur lors du scan de la région {region}: {str(e)}"}
+
         else:
             return {
                 "type": "text",
@@ -1382,6 +1738,26 @@ async def process_chat_message(
                     }
             except Exception as fallback_err:
                 logger.error(f"Fallback error: {fallback_err}")
+        elif fallback and fallback.get("action") == "scan_region":
+            try:
+                result = await _handle_scan_region(fallback["params"])
+                parcels = result.get("parcels", [])
+                if parcels:
+                    lats = [p["latitude"] for p in parcels if p["latitude"]]
+                    lngs = [p["longitude"] for p in parcels if p["longitude"]]
+                    return {
+                        "type": "parcel_results",
+                        "intro": fallback.get("intro", "Scan terminé (mode fallback) :"),
+                        "parcels": parcels,
+                        "composite_sites": result.get("groups", []),
+                        "sites_searched": [{"name": f"Scan {fallback['params'].get('region', '')}", "type": "scan_region"}],
+                        "total_found": result["total_found"],
+                        "returned": result["returned"],
+                        "fly_to": {"lat": sum(lats) / len(lats) if lats else 46.6, "lng": sum(lngs) / len(lngs) if lngs else 2.3, "zoom": 9},
+                        "params": fallback["params"],
+                    }
+            except Exception as fallback_err:
+                logger.error(f"Fallback scan_region error: {fallback_err}")
         return {
             "type": "error",
             "text": f"Erreur: {str(e)}",
@@ -1418,8 +1794,30 @@ def _try_direct_parse(message: str) -> dict:
                     break
         return {"action": "estimate_budget", "params": params, "intro": "Estimation budgétaire en cours..."}
 
+    # Scan region detection
+    if any(word in msg for word in ["scanne", "scan complet", "scan région", "scan automatique", "toutes les opportunités", "scan multi"]):
+        region_map = {
+            "paca": "PACA", "marseille": "PACA", "fos": "PACA", "provence": "PACA", "sud": "PACA",
+            "idf": "IDF", "paris": "IDF", "île-de-france": "IDF",
+            "nord": "HdF", "lille": "HdF", "hauts-de-france": "HdF", "hdf": "HdF",
+            "lyon": "AuRA", "auvergne": "AuRA", "aura": "AuRA",
+            "bretagne": "BRE", "rennes": "BRE",
+            "nantes": "PDL", "pays de la loire": "PDL",
+            "occitanie": "OCC", "toulouse": "OCC",
+            "grand est": "GES", "strasbourg": "GES",
+            "normandie": "NOR",
+            "nouvelle-aquitaine": "NAQ", "bordeaux": "NAQ",
+        }
+        params = {"mw_min": 10, "max_dist_poste_km": 5, "min_surface_ha": 0.5, "max_results": 50}
+        for key, region in region_map.items():
+            if key in msg:
+                params["region"] = region
+                break
+        if "region" in params:
+            return {"action": "scan_region", "params": params, "intro": f"Scan multi-postes de la région {params['region']} en cours..."}
+
     if any(word in msg for word in ["parcelle", "terrain", "trouve", "cherche", "propose"]):
-        params = {"min_surface_ha": 1.0, "nb_parcels": 10}
+        params = {"min_surface_ha": 1.0, "nb_parcels": 30}
 
         # Détecter la région
         region_map = {

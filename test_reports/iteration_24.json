@@ -1,0 +1,70 @@
+{
+  "summary": "Iteration 24 - P0/P1/P2 features verified. Backend: 11/11 tests passed (100%). Frontend: All features working correctly. P0: scan/dc-10mw regression OK, chat find_parcels works. P1: Pappers Immo URLs (pappers_immo_url, pappers_map_url, cadastre_gouv_url) present in all parcel results. P2: scan/region endpoint works for PACA, HdF, AuRA with deduplication.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "=== BACKEND API TESTS (11/11) ===",
+    "GET /api/ returns API info",
+    "GET /api/scan/dc-10mw?region=PACA regression test passed",
+    "POST /api/chat with find_parcels returns parcels (text response when no results)",
+    "GET /api/scan/region/PACA?mw_min=100&max_results=2 returns parcels with pappers_immo_url",
+    "GET /api/scan/region/HdF?mw_min=100&max_results=2 returns parcels with pappers_immo_url",
+    "Pappers URL format verified: https://immobilier.pappers.fr/?q={ref_cadastrale}",
+    "GET /api/scan/region/PACA?mw_min=20&max_results=5 works",
+    "GET /api/scan/region/HdF?mw_min=50&max_results=5 works with HdF alias",
+    "GET /api/scan/region/AuRA?mw_min=10&max_results=3 works",
+    "Scan region deduplicates parcels (no duplicate parcel_ids)",
+    "GET /api/map/electrical-assets returns 1091+ postes",
+    "=== FRONTEND UI TESTS ===",
+    "Dashboard loads correctly with SCAN DC 10MW button visible",
+    "Region buttons (PACA, HdF, AuRA, OCC, GES) visible in sidebar",
+    "Status bar shows 1091 postes, 61 DC, 8 LP",
+    "ChatBot opens and responds to queries",
+    "ChatBot parcel cards show Pappers link button (data-testid='pappers-link-*')",
+    "ChatBot parcel cards show cadastre link (data-testid='cadastre-link-*')",
+    "No '+X non affichées' truncation message in ChatBot (P0 fix verified)",
+    "ParcelDetail panel shows Pappers Immo button (data-testid='pappers-immo-btn')",
+    "ParcelDetail panel shows cadastre.gouv.fr link (data-testid='cadastre-gouv-btn')",
+    "SCAN DC 10MW button triggers region scan and displays results (34 sites, 8 postes scannés)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iteration24_p0_p1_p2.py",
+    "/app/test_reports/pytest/pytest_results_iteration24.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_iteration24_p0_p1_p2.py"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11 tests passed)",
+    "frontend": "100% (all features verified)"
+  },
+  "test_credentials": "Cookie: session_token=test_session_token_2026",
+  "seed_data_creation": "Used existing test user for UI testing",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 24 verified P0/P1/P2 features: 1) P0: nb_parcels limit raised to 30/50, no '+X non affichées' message. 2) P1: pappers_immo_url, pappers_map_url, cadastre_gouv_url added to all parcel results. URL format: https://immobilier.pappers.fr/?q={ref_cadastrale}. 3) P2: GET /api/scan/region/{region_code} endpoint works with REGION_ALIASES (HDF→HdF, AURA→AuRA, etc.). Scan takes 30-90s due to external API calls. Use mw_min=100 and max_results=2 for faster tests. All APIs are live (no mocked APIs).",
+  "features_verified": {
+    "P0_nb_parcels_limit": "Verified - ChatBot shows all parcels without truncation",
+    "P1_pappers_immo_urls": {
+      "pappers_immo_url": "https://immobilier.pappers.fr/?q={ref_cadastrale}",
+      "pappers_map_url": "https://immobilier.pappers.fr/#18/{lat}/{lon}",
+      "cadastre_gouv_url": "https://www.cadastre.gouv.fr/scpc/rechercherParReferenceCadastrale.do"
+    },
+    "P2_scan_region_endpoint": {
+      "endpoint": "GET /api/scan/region/{region_code}",
+      "params": "mw_min, max_dist_km, min_surface_ha, max_results",
+      "regions_tested": ["PACA", "HdF", "AuRA"],
+      "deduplication": "Verified - no duplicate parcel_ids"
+    }
+  },
+  "mocked_api_note": "No mocked APIs - All data is real from OSM/Overpass, S3REnR, IGN API Carto, and GPU"
+}

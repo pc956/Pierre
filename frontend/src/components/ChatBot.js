@@ -414,7 +414,7 @@ function ChatMessage({ msg, onSiteClick, onParcelClick }) {
                 Recherche autour de : {msg.sites_searched.map(s => s.name).join(', ')}
               </div>
             )}
-            {msg.parcels.slice(0, 10).map((p, i) => {
+            {msg.parcels.map((p, i) => {
               const scoreVal = p.score?.score || p.score?.score_net || 0;
               const verdict = p.score?.verdict || 'A_ETUDIER';
               const detail = p.score?.detail || {};
@@ -538,6 +538,40 @@ function ChatMessage({ msg, onSiteClick, onParcelClick }) {
                     )}
                   </div>
 
+                  {/* Pappers Immo link */}
+                  {(p.pappers_immo_url || p.pappers_map_url) && (
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <a
+                        href={p.pappers_immo_url || p.pappers_map_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1 px-2 py-1 rounded text-[9px] font-bold transition-colors hover:opacity-90"
+                        style={{ background: '#3b82f622', color: '#3b82f6', border: '1px solid #3b82f633' }}
+                        data-testid={`pappers-link-${i}`}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                          <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                        Propriétaire Pappers
+                      </a>
+                      {p.cadastre_gouv_url && (
+                        <a
+                          href={p.cadastre_gouv_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[9px] hover:underline"
+                          style={{ color: '#8f8f9d' }}
+                          data-testid={`cadastre-link-${i}`}
+                        >
+                          Cadastre officiel
+                        </a>
+                      )}
+                    </div>
+                  )}
+
                   {/* Budget estimation */}
                   {p.budget && (
                     <div className="mt-1.5 p-1.5 rounded" style={{ background: '#0a0a0f', border: '1px solid #1f1f2e' }} data-testid={`parcel-budget-${i}`}>
@@ -570,8 +604,8 @@ function ChatMessage({ msg, onSiteClick, onParcelClick }) {
               );
             })}
             {msg.total_found > msg.returned && (
-              <p className="text-[10px] text-center" style={{ color: '#8f8f9d' }}>
-                +{msg.total_found - msg.returned} parcelles non affichées
+              <p className="text-[10px] text-center" style={{ color: '#00d4aa' }}>
+                {msg.total_found} parcelles analysées · {msg.returned} affichées
               </p>
             )}
             {/* Composite sites (Étape 9) */}

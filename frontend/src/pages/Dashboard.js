@@ -1568,6 +1568,39 @@ function ParcelDetail({ parcel, onClose, onShowSiren, addToCompare, compareList 
                 </button>
               </div>
             )}
+            {/* Pappers Immo — Liens externes */}
+            {(parcel.pappers_immo_url || parcel.pappers_map_url) && (
+              <div className="pt-2 flex flex-wrap gap-2" style={{ borderTop: '1px solid #1f1f2e' }}>
+                <a
+                  href={parcel.pappers_immo_url || parcel.pappers_map_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold transition-colors hover:opacity-90"
+                  style={{ background: '#3b82f622', color: '#3b82f6', border: '1px solid #3b82f633' }}
+                  data-testid="pappers-immo-btn"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  Voir propriétaire sur Pappers
+                  <ExternalLink size={10} />
+                </a>
+                {parcel.cadastre_gouv_url && (
+                  <a
+                    href={parcel.cadastre_gouv_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-colors hover:opacity-90"
+                    style={{ color: '#8f8f9d', border: '1px solid #1f1f2e' }}
+                    data-testid="cadastre-gouv-btn"
+                  >
+                    Plan cadastral officiel
+                    <ExternalLink size={10} />
+                  </a>
+                )}
+              </div>
+            )}
             <div className="flex justify-between text-xs">
               <span style={{ color: '#8f8f9d' }}>Prix DVF (€/m²)</span>
               <span className="font-mono" style={{ color: '#ffa502' }}>

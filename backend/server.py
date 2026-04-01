@@ -32,7 +32,7 @@ from france_infra_data import get_all_france_infra
 from s3renr_data import S3RENR_DATA, get_s3renr_top_opportunities
 from dc_search_api import dc_search, dc_get_site
 from gpt_agent_config import get_openapi_schema, COCKPIT_IMMO_GPT_SYSTEM_PROMPT
-from chat_assistant import process_chat_message
+from chat_assistant import process_chat_message, _handle_scan_region
 from dvf_data import get_dvf_for_commune, get_dvf_for_region
 from pdf_export import generate_parcel_pdf
 from rte_future_line import (
@@ -1026,6 +1026,42 @@ async def scan_around_poste(
         "parcelles": parcelles,
         "count": len(parcelles),
     }
+
+
+@api_router.get("/scan/region/{region_code}")
+async def scan_region_endpoint(
+    region_code: str,
+    mw_min: float = 10,
+    max_dist_km: float = 5,
+    min_surface_ha: float = 0.5,
+    max_results: int = 50,
+):
+    """Scan multi-postes: scanne toutes les parcelles autour des postes RTE
+    d'une région ayant au moins mw_min MW disponibles."""
+    # Map common variants to actual S3REnR keys
+    REGION_ALIASES = {
+        "HDF": "HdF", "HAUTSDEFRANCE": "HdF", "HAUTS-DE-FRANCE": "HdF",
+        "IDF": "IDF", "ILE-DE-FRANCE": "IDF",
+        "PACA": "PACA",
+        "AURA": "AuRA", "AUVERGNE-RHONE-ALPES": "AuRA",
+        "OCC": "OCC", "OCCITANIE": "OCC",
+        "GES": "GES", "GRAND-EST": "GES", "GRANDEST": "GES",
+        "NAQ": "NAQ", "NOUVELLE-AQUITAINE": "NAQ",
+        "BRE": "BRE", "BRETAGNE": "BRE",
+        "NOR": "NOR", "NORMANDIE": "NOR",
+        "PDL": "PDL", "PAYS-DE-LA-LOIRE": "PDL",
+    }
+    region_input = region_code.upper().replace(" ", "")
+    actual_region = REGION_ALIASES.get(region_input, region_code)
+    params = {
+        "region": actual_region,
+        "mw_min": mw_min,
+        "max_dist_poste_km": max_dist_km,
+        "min_surface_ha": min_surface_ha,
+        "max_results": min(max_results, 50),
+    }
+    result = await _handle_scan_region(params)
+    return result
 
 
 # ═══════════════════════════════════════════════════════════
