@@ -29,10 +29,20 @@ Plateforme de prospection foncière pour data centers en France. Interface IA-Fi
 - [x] **Fix PLU matching**: Filter souple (U matche UI/UX/UE et inversement)
 - [x] **Fix timeout chat**: Pre-filter surface avant enrichissement, timeout Overpass, max 3 sites/région
 
+### V10 — Fix Agent IA + Scan Région (01/04/2026)
+- [x] **P0 — Limites recherche**: nb_parcels 10→30 (max 50), rayon 2000→5000m (max 10000m), suppression "+X non affichées"
+- [x] **P1 — Liens Pappers Immo**: `pappers_immo_url`, `pappers_map_url`, `cadastre_gouv_url` sur chaque parcelle (sans clé API)
+- [x] **P2 — Scan Région multi-postes**: `GET /api/scan/region/{region_code}` — scan top 15 postes S3REnR par MW dispo, rayon 5km, déduplication, groupement adjacent
+- [x] **P3 — Raisonnement IA multi-niveaux**: Stratégie en entonnoir (commune→région→élargi), auto-widen si <5 résultats, instructions Pappers dans SYSTEM_PROMPT
+- [x] **Action scan_region**: Nouvelle action IA pour scan automatique régional via chatbot
+- [x] **REGION_ALIASES**: Mapping HDF→HdF, AURA→AuRA, etc. dans l'endpoint
+
 ### Tests
-- [x] Iteration 23: 100% backend (8/8), 100% frontend — V9
+- [x] Iteration 24: 100% backend (11/11), 100% frontend — V10
 
 ## Backlog
+- [ ] **P0**: Exécuter PROMPT_V5.3_FINAL.md (138 KB) + PIPELINE_BOOTSTRAP_CLAUDE_CODE.md
+- [ ] **P1**: prompt_emergent_acces_restreint.md — whitelist emails + rate limiting
 - [ ] **P1**: Overlay risques Géorisques vectoriel sur carte
 - [ ] **P2**: Mode COMEX (vue exécutive)
 - [ ] **P2**: Alertes automatiques
