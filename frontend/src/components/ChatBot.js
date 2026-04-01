@@ -54,14 +54,17 @@ export default function ChatBot({ onFlyTo, onHighlightSites, onSelectParcelFromC
         message: text,
         session_id: sessionId,
         history,
-      });
+      }, { timeout: 55000 });
 
       const data = res.data;
       handleResponse(data);
     } catch (err) {
+      const isTimeout = err.code === 'ECONNABORTED' || (err.message && err.message.includes('timeout'));
       setMessages(prev => [...prev, {
         role: 'assistant', type: 'text',
-        content: 'Désolé, une erreur est survenue. Réessayez.',
+        content: isTimeout
+          ? 'La recherche prend plus de temps que prévu. Essayez avec une commune spécifique (ex: "Parcelles à Fos-sur-Mer") plutôt qu\'une région entière.'
+          : 'Désolé, une erreur est survenue. Réessayez.',
       }]);
     }
     setLoading(false);

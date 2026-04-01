@@ -538,9 +538,17 @@ async def _enrich_parcel(parsed: dict, infra: dict, params: dict) -> dict:
 
     parsed["plu_scoring"] = plu_scoring_result
 
-    # Filter par zones PLU
-    if plu_zones and parsed["plu_zone"] not in plu_zones and parsed["plu_zone"] != "inconnu":
-        return None
+    # Filter par zones PLU — matching souple (U matche UI/UX/UE, et inversement)
+    if plu_zones and parsed["plu_zone"] != "inconnu":
+        actual_zone = parsed["plu_zone"].upper()
+        match_found = False
+        for wanted in plu_zones:
+            wanted_up = wanted.upper()
+            if actual_zone == wanted_up or actual_zone.startswith(wanted_up) or wanted_up.startswith(actual_zone):
+                match_found = True
+                break
+        if not match_found:
+            return None
 
     # Auto-exclude EXCLUDED PLU
     if plu_scoring_result.get("plu_status") == "EXCLUDED":
@@ -713,13 +721,20 @@ async def _find_real_parcels(params: dict) -> dict:
         effective_radius = max(effective_radius, 4000)
     effective_radius = min(effective_radius, 5000)
 
+    # Limit sites to avoid timeout (max 3 for region-wide, 5 for commune)
+    max_sites = 5 if commune_name else 3
+    top_sites = top_sites[:max_sites]
+
     # ── ÉTAPE 4A: Recherche parallèle des parcelles par site ──
     async def _search_site(site):
         lat = site["location"]["lat"]
         lng = site["location"]["lng"]
         site_name = site.get("name", "")
         try:
-            data = await get_parcelles_around_point(lng, lat, radius_m=effective_radius, limit=120)
+            data = await asyncio.wait_for(
+                get_parcelles_around_point(lng, lat, radius_m=effective_radius, limit=80),
+                timeout=10
+            )
             features = data.get("features", [])
             return site_name, site, features
         except Exception as e:
@@ -739,20 +754,33 @@ async def _find_real_parcels(params: dict) -> dict:
             "parcels_found": len(features),
         })
 
-        # Parse features and enrich in parallel
+        # Parse features and filter by surface BEFORE enrichment (saves API calls)
         parsed_list = []
         for feature in features:
             p = parse_parcelle_feature(feature)
             if p.get("centroid"):
+                # Pre-filter by surface to avoid enriching tiny parcels
+                surface_ha = (p.get("surface_m2") or 0) / 10000
+                if surface_ha < min_surface_ha * 0.8:
+                    continue
                 p["site_origin"] = site_name
                 parsed_list.append(p)
+
+        # Limit to top 30 per site (by surface desc) to avoid overloading APIs
+        parsed_list.sort(key=lambda x: -(x.get("surface_m2") or 0))
+        parsed_list = parsed_list[:30]
 
         # Enrich parcels in parallel (batches of 10 to avoid API overload)
         for i in range(0, len(parsed_list), 10):
             batch = parsed_list[i:i+10]
-            enriched = await asyncio.gather(
-                *[_enrich_parcel(p, infra, params) for p in batch]
-            )
+            try:
+                enriched = await asyncio.wait_for(
+                    asyncio.gather(*[_enrich_parcel(p, infra, params) for p in batch]),
+                    timeout=15
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"Enrichment timeout for batch at site {site_name}")
+                enriched = []
             for ep in enriched:
                 if ep is not None:
                     all_parcels.append(ep)
@@ -800,7 +828,10 @@ async def _find_real_parcels(params: dict) -> dict:
 
     # Enrich top 3 parcels with Overpass data (sequential to respect rate limits)
     for p in final_parcels[:3]:
-        await _enrich_overpass(p)
+        try:
+            await asyncio.wait_for(_enrich_overpass(p), timeout=8)
+        except asyncio.TimeoutError:
+            logger.warning(f"Overpass timeout for parcel {p.get('parcel_id', '?')}")
 
     # BUG 1 FIX — Recalculer le score avec les nouvelles données eau/route
     for p in final_parcels[:3]:
