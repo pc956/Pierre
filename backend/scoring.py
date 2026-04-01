@@ -1,12 +1,13 @@
 """
-Cockpit Immo - Scoring Engine v2
+Cockpit Immo - Scoring Engine v3
 Score universel /100 pour prospection foncière data center.
-4 axes + malus. UN SEUL score, pas de project_type.
+5 axes + malus. Optimisé pour cible DC 10 MW.
+Axes: Distance RTE (35pts), MW S3REnR (25pts), PLU (20pts), Surface (10pts), TTM raccordement (10pts)
 """
 from typing import Dict, Any, List
 
 # ═══════════════════════════════════════════════════════════
-# PLU ZONES (conservé)
+# PLU ZONES
 # ═══════════════════════════════════════════════════════════
 
 PLU_ZONES = {
@@ -27,60 +28,64 @@ PLU_ZONES = {
 
 def compute_score_simple(parcel: dict) -> dict:
     """Score universel /100 pour prospection foncière data center.
-    4 axes + malus. Retourne score, verdict, détail, flags, resume."""
+    5 axes + malus. Retourne score, verdict, ttm_months, détail, flags, resume."""
 
     flags: List[str] = []
 
-    # ─── AXE 1 — Distance poste RTE (0 à 40 pts) ───
+    # ─── AXE 1 — Distance poste RTE (0 à 35 pts) ───
     dist_htb_m = parcel.get("dist_poste_htb_m") or 99999
     dist_htb_km = dist_htb_m / 1000
 
     if dist_htb_km < 1:
-        pts_distance = 40
-    elif dist_htb_km < 2:
         pts_distance = 35
+    elif dist_htb_km < 2:
+        pts_distance = 30
     elif dist_htb_km < 3:
-        pts_distance = 28
+        pts_distance = 24
     elif dist_htb_km < 5:
-        pts_distance = 20
+        pts_distance = 17
     elif dist_htb_km < 8:
-        pts_distance = 12
+        pts_distance = 10
     elif dist_htb_km < 12:
-        pts_distance = 5
+        pts_distance = 4
     else:
         pts_distance = 0
 
     # Bonus tension
     tension_kv = parcel.get("tension_htb_kv") or 0
     if tension_kv >= 400:
-        pts_distance = min(40, pts_distance + 5)
+        pts_distance = min(35, pts_distance + 4)
     elif tension_kv >= 225:
-        pts_distance = min(40, pts_distance + 3)
+        pts_distance = min(35, pts_distance + 2)
 
-    # ─── AXE 2 — MW disponibles S3REnR (0 à 30 pts) ───
+    # ─── AXE 2 — MW disponibles S3REnR (0 à 25 pts) ───
     etat_s3renr = (parcel.get("zone_saturation") or "inconnu").lower()
     mw_dispo = parcel.get("mw_dispo") or 0
     renforcement = parcel.get("renforcement_prevu")
 
-    if etat_s3renr == "disponible" or etat_s3renr == "disponible":
-        if mw_dispo > 100:
-            pts_mw = 30
-        elif mw_dispo > 50:
+    if etat_s3renr == "disponible":
+        if mw_dispo >= 50:
             pts_mw = 25
-        elif mw_dispo > 20:
+        elif mw_dispo >= 20:
+            pts_mw = 23
+        elif mw_dispo >= 10:
             pts_mw = 20
+        elif mw_dispo >= 5:
+            pts_mw = 15
+        elif mw_dispo > 0:
+            pts_mw = 8
         else:
-            pts_mw = 12
+            pts_mw = 10
     elif etat_s3renr in ("contraint", "tendu"):
-        pts_mw = 8
+        pts_mw = 6
     elif etat_s3renr == "sature":
         pts_mw = 0
     else:
-        pts_mw = 10  # inconnu
+        pts_mw = 8  # inconnu
 
     # Bonus renforcement prévu
     if renforcement:
-        pts_mw = min(30, pts_mw + 5)
+        pts_mw = min(25, pts_mw + 4)
 
     # ─── AXE 3 — Compatibilité PLU (0 à 20 pts) ───
     plu_zone = (parcel.get("plu_zone") or "inconnu").upper().strip()
@@ -105,19 +110,46 @@ def compute_score_simple(parcel: dict) -> dict:
     else:
         pts_plu = 8  # inconnu
 
-    # ─── AXE 4 — Surface (0 à 10 pts) ───
+    # ─── AXE 4 — Surface (0 à 10 pts) — calibré 10MW (1-2 ha idéal) ───
     surface_ha = parcel.get("surface_ha") or (parcel.get("surface_m2", 0) / 10000)
 
-    if surface_ha > 5:
+    if surface_ha >= 3:
         pts_surface = 10
-    elif surface_ha >= 3:
-        pts_surface = 8
+    elif surface_ha >= 2:
+        pts_surface = 9
     elif surface_ha >= 1:
-        pts_surface = 6
+        pts_surface = 7
     elif surface_ha >= 0.5:
-        pts_surface = 3
+        pts_surface = 4
     else:
         pts_surface = 0
+
+    # ─── AXE 5 — Délai raccordement estimé (0 à 10 pts) ───
+    ttm_months = 36  # Défaut
+
+    if dist_htb_km < 1 and etat_s3renr == "disponible" and mw_dispo >= 10:
+        ttm_months = 14
+        pts_ttm = 10
+    elif dist_htb_km < 3 and etat_s3renr == "disponible" and mw_dispo >= 10:
+        ttm_months = 20
+        pts_ttm = 7
+    elif dist_htb_km < 5 and etat_s3renr == "disponible":
+        ttm_months = 28
+        pts_ttm = 4
+    elif etat_s3renr in ("contraint", "tendu"):
+        ttm_months = 36
+        pts_ttm = 1
+    elif etat_s3renr == "sature":
+        ttm_months = 48
+        pts_ttm = 0
+    else:
+        ttm_months = 30
+        pts_ttm = 2
+
+    # Si renforcement prévu par RTE, ajuster
+    if renforcement:
+        ttm_months = max(12, ttm_months - 6)
+        pts_ttm = min(10, pts_ttm + 2)
 
     # ─── MALUS ───
     malus_total = 0
@@ -150,7 +182,7 @@ def compute_score_simple(parcel: dict) -> dict:
         flags.append("ZONE ARCHEOLOGIQUE (DRAC)")
 
     # ─── SCORE TOTAL ───
-    score_brut = pts_distance + pts_mw + pts_plu + pts_surface
+    score_brut = pts_distance + pts_mw + pts_plu + pts_surface + pts_ttm
     score_total = max(0, min(100, score_brut + malus_total))
 
     # ─── VERDICT ───
@@ -181,6 +213,8 @@ def compute_score_simple(parcel: dict) -> dict:
         resume_parts.append(f"avec {int(mw_dispo)} MW disponibles")
     elif etat_s3renr == "sature":
         resume_parts.append("réseau saturé")
+
+    resume_parts.append(f"Raccordement estimé: ~{ttm_months} mois")
 
     # Cours d'eau
     dist_eau = parcel.get("dist_cours_eau_m")
@@ -213,11 +247,13 @@ def compute_score_simple(parcel: dict) -> dict:
     return {
         "score": score_total,
         "verdict": verdict,
+        "ttm_months": ttm_months,
         "detail": {
             "distance_rte": pts_distance,
             "mw_disponibles": pts_mw,
             "plu": pts_plu,
             "surface": pts_surface,
+            "raccordement_speed": pts_ttm,
             "malus": malus_total,
         },
         "flags": flags,

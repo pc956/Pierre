@@ -5,7 +5,8 @@ import axios from 'axios';
 import { 
   Server, Map as MapIcon, Bell, LogOut, Building2,
   ChevronDown, TrendingUp, AlertTriangle, CheckCircle, XCircle,
-  Layers, Eye, EyeOff, ExternalLink, X, Loader, Menu, FileDown
+  Layers, Eye, EyeOff, ExternalLink, X, Loader, Menu, FileDown,
+  Zap, Loader2
 } from 'lucide-react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents, Marker, Polyline, Polygon as LeafletPolygon, WMSTileLayer } from 'react-leaflet';
 import L from 'leaflet';
@@ -196,6 +197,10 @@ export default function Dashboard() {
   
   // RTE Future 400kV line data
   const [futureLine400kv, setFutureLine400kv] = useState(null);
+
+  // Scan DC 10 MW
+  const [scanResults, setScanResults] = useState(null);
+  const [scanLoading, setScanLoading] = useState(false);
   
   // Layer visibility
   const [showLayers, setShowLayers] = useState(false);
@@ -362,6 +367,36 @@ export default function Dashboard() {
   const lignes400 = electricalAssets.filter(a => a.type === 'ligne_400kv');
   const lignes225 = electricalAssets.filter(a => a.type === 'ligne_225kv');
 
+  const handleScanDC10MW = async (region = null) => {
+    setScanLoading(true);
+    setScanResults(null);
+    try {
+      const params = new URLSearchParams({ max_distance_km: '5', min_surface_ha: '1', max_ttm_months: '36', limit: '50' });
+      if (region) params.set('region', region);
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/scan/dc-10mw?${params}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setScanResults(data);
+      if (data.candidates?.length > 0) {
+        const newParcels = data.candidates.map(c => ({
+          ...c,
+          latitude: c.centroid?.coordinates?.[1] || c.latitude || 0,
+          longitude: c.centroid?.coordinates?.[0] || c.longitude || 0,
+          source: 'scan_dc_10mw',
+        }));
+        setFranceParcels(prev => {
+          const existing = new Set(prev.map(p => p.parcel_id));
+          const toAdd = newParcels.filter(p => !existing.has(p.parcel_id));
+          return [...prev, ...toAdd];
+        });
+      }
+    } catch (e) {
+      console.error('Scan DC 10MW error:', e);
+    } finally {
+      setScanLoading(false);
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col" style={{ background: '#0a0a0f' }}>
       {/* Main content */}
@@ -387,6 +422,19 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
+            {/* Scan DC 10MW button */}
+            {!isMobile && (
+              <button
+                onClick={() => handleScanDC10MW('PACA')}
+                disabled={scanLoading}
+                className="h-8 px-3 flex items-center gap-1.5 text-[10px] font-mono uppercase rounded"
+                style={{ background: scanLoading ? '#1f1f2e' : '#ff475722', color: '#ff4757', border: '1px solid #ff475733' }}
+                data-testid="scan-dc-10mw-btn"
+              >
+                {scanLoading ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                {scanLoading ? 'Scan...' : 'Scan DC 10MW'}
+              </button>
+            )}
             {isMobile && (
               <button 
                 onClick={() => setMobileSidebar(!mobileSidebar)}
@@ -1031,6 +1079,17 @@ export default function Dashboard() {
                     onSendChat={(query) => {
                       setExternalChatMessage(query);
                     }}
+                    scanResults={scanResults}
+                    scanLoading={scanLoading}
+                    onScanDC10MW={handleScanDC10MW}
+                    onSelectParcel={(p) => {
+                      setSelectedParcel({
+                        ...p,
+                        latitude: p.centroid?.coordinates?.[1] || p.latitude || 0,
+                        longitude: p.centroid?.coordinates?.[0] || p.longitude || 0,
+                        source: 'scan_dc_10mw',
+                      });
+                    }}
                   />
                 )}
               </div>
@@ -1147,6 +1206,7 @@ export default function Dashboard() {
                     { label: 'Fibre', render: p => p.dist_backbone_fibre_m ? `${(p.dist_backbone_fibre_m/1000).toFixed(1)} km` : '-' },
                     { label: 'Risques', render: p => (p.score?.flags || []).join(', ') || 'Aucun' },
                     { label: 'Projet Fos', render: p => p.projet_fos || '-' },
+                    { label: 'Délai racc.', render: p => p.score?.ttm_months ? `~${p.score.ttm_months} mois` : '-' },
                   ].map((row, ri) => (
                     <tr key={ri} style={{ borderBottom: '1px solid #1f1f2e08', background: ri % 2 === 0 ? '#12121a' : 'transparent' }}>
                       <td className="py-2 px-3" style={{ color: '#8f8f9d' }}>{row.label}</td>
@@ -1356,10 +1416,11 @@ function ParcelDetail({ parcel, onClose, onShowSiren, addToCompare, compareList 
           <div className="panel p-3">
             <p className="text-xs font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>Détail du score</p>
             <div className="space-y-1.5">
-              <DetailBar label="Distance RTE" value={score.detail.distance_rte || 0} max={40} />
-              <DetailBar label="MW disponibles" value={score.detail.mw_disponibles || 0} max={30} />
+              <DetailBar label="Distance RTE" value={score.detail.distance_rte || 0} max={35} />
+              <DetailBar label="MW dispo" value={score.detail.mw_disponibles || 0} max={25} />
               <DetailBar label="PLU" value={score.detail.plu || 0} max={20} />
               <DetailBar label="Surface" value={score.detail.surface || 0} max={10} />
+              <DetailBar label="Raccordement" value={score.detail.raccordement_speed || 0} max={10} />
               {score.detail.malus < 0 && (
                 <div className="flex justify-between text-xs mt-1">
                   <span style={{ color: '#ff4757' }}>Malus</span>
@@ -1405,12 +1466,63 @@ function ParcelDetail({ parcel, onClose, onShowSiren, addToCompare, compareList 
             </p>
           </div>
           <div className="panel p-3">
-            <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Zone PLU</p>
-            <p className="text-lg font-mono font-bold" style={{ color: '#e8e8ed' }}>
-              {parcel.plu_zone || '-'}
+            <p className="text-xs font-mono uppercase" style={{ color: '#8f8f9d' }}>Délai racc.</p>
+            <p className="text-lg font-mono font-bold" style={{
+              color: score.ttm_months <= 18 ? '#2ed573' : score.ttm_months <= 30 ? '#ffa502' : '#ff4757'
+            }}>
+              {score.ttm_months ? `~${score.ttm_months} mois` : '-'}
             </p>
           </div>
         </div>
+
+        {/* Raccordement 10 MW */}
+        {score.ttm_months && (
+          <div className="panel p-3" data-testid="raccordement-10mw-panel">
+            <p className="text-xs font-mono uppercase mb-2" style={{ color: '#00d4aa' }}>Raccordement 10 MW</p>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs" style={{ color: '#8f8f9d' }}>Délai estimé</span>
+              <span className="text-sm font-mono font-bold px-2 py-0.5 rounded" style={{
+                background: score.ttm_months <= 18 ? '#2ed57322' : score.ttm_months <= 30 ? '#ffa50222' : '#ff475722',
+                color: score.ttm_months <= 18 ? '#2ed573' : score.ttm_months <= 30 ? '#ffa502' : '#ff4757',
+              }}>
+                ~{score.ttm_months} mois
+              </span>
+            </div>
+            <div className="space-y-1 text-[10px]" style={{ color: '#8f8f9d' }}>
+              <div className="flex justify-between">
+                <span>Poste RTE</span>
+                <span style={{ color: '#e8e8ed' }}>{parcel.nearest_htb_name || '-'} ({parcel.tension_htb_kv || 0}kV)</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Distance</span>
+                <span style={{ color: '#e8e8ed' }}>{parcel.dist_poste_htb_m ? `${(parcel.dist_poste_htb_m/1000).toFixed(1)} km` : '-'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>MW disponibles</span>
+                <span style={{ color: (parcel.mw_dispo || 0) >= 10 ? '#2ed573' : '#ffa502' }}>
+                  {parcel.mw_dispo || 0} MW ({parcel.zone_saturation || 'inconnu'})
+                </span>
+              </div>
+              {parcel.renforcement_prevu && (
+                <div className="flex justify-between">
+                  <span>Renforcement</span>
+                  <span style={{ color: '#00d4aa' }}>{parcel.renforcement_prevu}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span>Zone PLU</span>
+                <span style={{ color: '#e8e8ed' }}>{parcel.plu_zone || '-'} {parcel.plu_libelle ? `(${parcel.plu_libelle.substring(0, 30)})` : ''}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Mode racc.</span>
+                <span style={{ color: '#e8e8ed' }}>
+                  {parcel.dist_poste_htb_m < 3000 && (parcel.tension_htb_kv || 0) >= 225 ? 'HTB direct' : 
+                   parcel.dist_poste_htb_m < 5000 ? 'HTB standard' : 'HTB long / Enedis HTA'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Propriétaire & Foncier */}
         <div className="panel p-3">
@@ -2011,7 +2123,7 @@ function DetailBar({ label, value, max }) {
 
 // End of file
 
-function EmptyStatePanel({ postes, onSendChat }) {
+function EmptyStatePanel({ postes, onSendChat, scanResults, scanLoading, onScanDC10MW, onSelectParcel }) {
   const totalPostes = postes?.length || 0;
 
   const quickSearches = [
@@ -2026,6 +2138,71 @@ function EmptyStatePanel({ postes, onSendChat }) {
   return (
     <div className="p-4 overflow-y-auto" style={{ maxHeight: '100%' }} data-testid="empty-state-panel">
       <h3 className="text-sm font-mono uppercase mb-4" style={{ color: '#00d4aa' }}>Cockpit Immo</h3>
+
+      {/* Scan DC 10 MW */}
+      <div className="mb-4" data-testid="scan-section">
+        <p className="text-[10px] font-mono uppercase mb-2" style={{ color: '#8f8f9d' }}>Scan automatique</p>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {['PACA', 'HdF', 'AuRA', 'OCC', 'GES'].map(r => (
+            <button
+              key={r}
+              onClick={() => onScanDC10MW && onScanDC10MW(r)}
+              disabled={scanLoading}
+              className="px-2 py-1 text-[9px] font-mono rounded hover:opacity-80"
+              style={{ background: '#ff475712', border: '1px solid #ff475733', color: '#ff4757' }}
+              data-testid={`scan-region-${r}`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+
+        {scanLoading && (
+          <div className="flex items-center gap-2 p-2 rounded" style={{ background: '#1f1f2e' }}>
+            <Loader2 size={12} className="animate-spin" style={{ color: '#ff4757' }} />
+            <span className="text-[10px]" style={{ color: '#8f8f9d' }}>Scan en cours...</span>
+          </div>
+        )}
+
+        {scanResults && !scanLoading && (
+          <div data-testid="scan-results">
+            <p className="text-[9px] font-mono mb-1" style={{ color: '#8f8f9d' }}>
+              {scanResults.total_found} parcelles · {scanResults.postes_scanned} postes scannés
+            </p>
+            <div className="space-y-1 max-h-[200px] overflow-y-auto">
+              {(scanResults.candidates || []).slice(0, 10).map((c, i) => (
+                <button
+                  key={i}
+                  onClick={() => onSelectParcel && onSelectParcel(c)}
+                  className="w-full text-left p-2 rounded hover:opacity-80"
+                  style={{ background: '#0a0a0f', border: '1px solid #1e1e35' }}
+                  data-testid={`scan-result-${i}`}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-bold" style={{ color: '#e8e8ed' }}>
+                      {c.commune || c.parcel_id?.substring(0, 15)}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold px-1.5 rounded" style={{
+                      background: (c.score?.verdict === 'GO') ? '#2ed57322' : (c.score?.verdict === 'A_ETUDIER') ? '#ffa50222' : '#ff475722',
+                      color: (c.score?.verdict === 'GO') ? '#2ed573' : (c.score?.verdict === 'A_ETUDIER') ? '#ffa502' : '#ff4757',
+                    }}>
+                      {c.score?.score || 0}/100
+                    </span>
+                  </div>
+                  <div className="flex gap-2 mt-0.5 text-[8px]" style={{ color: '#555' }}>
+                    <span>{c.surface_ha?.toFixed(1)}ha</span>
+                    <span>{c.mw_dispo || 0} MW</span>
+                    <span>{c.dist_poste_htb_m ? `${(c.dist_poste_htb_m/1000).toFixed(1)}km` : '-'}</span>
+                    <span style={{ color: c.score?.ttm_months <= 18 ? '#2ed573' : c.score?.ttm_months <= 30 ? '#ffa502' : '#ff4757' }}>
+                      ~{c.score?.ttm_months || '?'}m
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Recherche rapide */}
       <div className="mb-4" data-testid="quick-search-section">

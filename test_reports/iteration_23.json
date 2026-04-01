@@ -1,0 +1,74 @@
+{
+  "summary": "Iteration 23 - Scoring v3 (5 axes) + Scan DC 10MW + S3REnR Extended Regions. Backend: 8/8 tests passed (100%). Frontend: All features verified after bug fix. Fixed setFilteredParcels → setFranceParcels bug in handleScanDC10MW function.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "=== BACKEND API TESTS (8/8) ===",
+    "GET /api/ returns API info (version 1.0.0)",
+    "GET /api/scan/dc-10mw?region=PACA returns candidates with score, ttm_months, mw_dispo",
+    "GET /api/scan/dc-10mw?region=AuRA returns candidates (tests new AuRA S3REnR data)",
+    "GET /api/map/electrical-assets returns 1091+ postes",
+    "GET /api/s3renr/summary returns data for OCC, AuRA, GES, NAQ regions",
+    "POST /api/chat with 'Parcelles à Fos-sur-Mer' returns parcel_results with ttm_months in score",
+    "Scoring v3 structure verified: 5 axes (distance_rte/35, mw_disponibles/25, plu/20, surface/10, raccordement_speed/10)",
+    "GET /api/scan/around-poste/REALTOR returns parcels with scores",
+    "=== FRONTEND UI TESTS ===",
+    "SCAN DC 10MW button visible in header bar",
+    "EmptyStatePanel shows Scan Automatique section with region buttons (PACA, HdF, AuRA, OCC, GES)",
+    "Status bar shows 1091 postes",
+    "Clicking PACA scan button triggers loading and shows 10+ results",
+    "Score breakdown shows 5 bars (Distance RTE /35, MW dispo /25, PLU /20, Surface /10, Raccordement /10)",
+    "TTM (délai raccordement) displayed in parcel detail (~12 mois for Fos-sur-Mer)",
+    "Scan results display with scores (88/100 for Fos-sur-Mer parcel)"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iteration23_scoring_v3_scan.py",
+    "/app/test_reports/pytest/pytest_results_iteration23.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_iteration23_scoring_v3_scan.py",
+    "/app/frontend/src/pages/Dashboard.js (fixed setFilteredParcels → setFranceParcels bug)"
+  ],
+  "success_rate": {
+    "backend": "100% (8/8 tests passed)",
+    "frontend": "100% (all features verified after bug fix)"
+  },
+  "test_credentials": "Cookie: session_token=test_session_token_2026",
+  "seed_data_creation": "Used existing test user 'test_user_01' with session for UI testing",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iteration 23 verified Scoring v3 + Scan DC 10MW + S3REnR extended regions. Key changes: 1) Scoring v3 with 5 axes: distance_rte/35, mw_disponibles/25, plu/20, surface/10, raccordement_speed/10 + malus. 2) ttm_months returned in score dict. 3) GET /api/scan/dc-10mw endpoint scans postes with >=10 MW dispo and returns scored parcels. 4) S3REnR extended to 8 regions: IDF, PACA, HdF, OCC, AuRA, GES, NAQ. 5) Fixed bug in Dashboard.js: setFilteredParcels was undefined, changed to setFranceParcels. All APIs are live (no mocked APIs).",
+  "bug_fixed": {
+    "file": "/app/frontend/src/pages/Dashboard.js",
+    "line": 387,
+    "issue": "ReferenceError: setFilteredParcels is not defined",
+    "fix": "Changed setFilteredParcels to setFranceParcels in handleScanDC10MW function",
+    "root_cause": "Variable name mismatch - filteredParcels was renamed to franceParcels but handleScanDC10MW still used old name"
+  },
+  "scoring_v3_verification": {
+    "axes": {
+      "distance_rte": "0-35 pts based on distance to HTB poste",
+      "mw_disponibles": "0-25 pts based on S3REnR MW available",
+      "plu": "0-20 pts based on PLU zone compatibility",
+      "surface": "0-10 pts based on parcel surface (1-2 ha ideal for 10MW)",
+      "raccordement_speed": "0-10 pts based on estimated TTM"
+    },
+    "ttm_months": "Returned in score dict, ranges 12-48 months",
+    "malus": "Applied for PPRI, seismic zone, saturated network, DRAC archaeology"
+  },
+  "s3renr_extended_regions": {
+    "original": ["IDF", "PACA", "HdF"],
+    "new": ["OCC", "AuRA", "GES", "NAQ"],
+    "total": 8
+  },
+  "mocked_api_note": "No mocked APIs - All data is real from OSM/Overpass, S3REnR, and IGN API Carto"
+}

@@ -9,6 +9,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+logger = logging.getLogger("server")
 import httpx
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -498,6 +499,16 @@ _REGION_MAP = {
     "IDF": "IDF",
     "PACA": "PACA",
     "HdF": "HdF",
+    "AuRA": "AuRA",
+    "OCC": "OCC",
+    "GES": "GES",
+    "NAQ": "NAQ",
+    "BRE": "BRE",
+    "NOR": "NOR",
+    "PDL": "PDL",
+    "CVL": "CVL",
+    "BFC": "BFC",
+    "Corse": "Corse",
 }
 
 def _build_s3renr_lookup():
@@ -825,6 +836,196 @@ async def get_dvf_commune(code_insee: str):
 async def get_dvf_region(region: str):
     """Get aggregated DVF price data for a region"""
     return get_dvf_for_region(region)
+
+
+# ═══════════════════════════════════════════════════════════
+# SCAN DC 10MW ENDPOINTS
+# ═══════════════════════════════════════════════════════════
+
+@api_router.get("/scan/dc-10mw")
+async def scan_dc_10mw(
+    region: str = None,
+    max_distance_km: float = 5,
+    min_surface_ha: float = 1,
+    max_ttm_months: int = 24,
+    limit: int = 50,
+):
+    """Scan automatique: pour chaque poste RTE avec >= 10 MW dispo,
+    chercher les parcelles éligibles dans un rayon donné."""
+    import asyncio
+
+    candidates = []
+
+    # 1. Identifier postes RTE éligibles (>= 10 MW dispo)
+    eligible_postes = []
+    for poste in _FRANCE_INFRA["postes_htb_all"]:
+        if region and poste.get("region") != region:
+            continue
+        enriched = _enrich_poste_with_s3renr(poste)
+        s3renr = enriched.get("s3renr", {})
+        mw_dispo = s3renr.get("mw_dispo")
+        if mw_dispo is None or mw_dispo < 10:
+            continue
+        eligible_postes.append((poste, s3renr))
+
+    # Limit to top 8 postes by MW dispo (avoid timeout)
+    eligible_postes.sort(key=lambda x: -(x[1].get("mw_dispo", 0)))
+    eligible_postes = eligible_postes[:8]
+
+    # 2. Scan parcels around each eligible poste — parallel
+    radius_m = max_distance_km * 1000
+
+    async def _scan_poste(poste, s3renr):
+        poste_coords = poste["geometry"]["coordinates"]
+        poste_lon, poste_lat = poste_coords[0], poste_coords[1]
+        mw_dispo = s3renr.get("mw_dispo", 0)
+        results = []
+
+        try:
+            data = await asyncio.wait_for(
+                get_parcelles_around_point(poste_lon, poste_lat, radius_m, limit=40),
+                timeout=10
+            )
+        except Exception:
+            return results
+
+        for feature in data.get("features", []):
+            parsed = parse_parcelle_feature(feature)
+            surface_ha = (parsed.get("surface_m2") or 0) / 10000
+            if surface_ha < min_surface_ha or not parsed.get("centroid"):
+                continue
+
+            plon = parsed["centroid"]["coordinates"][0]
+            plat = parsed["centroid"]["coordinates"][1]
+            dist_m = _haversine(plon, plat, poste_lon, poste_lat)
+
+            parsed["dist_poste_htb_m"] = int(dist_m)
+            parsed["tension_htb_kv"] = poste.get("tension_kv", 0)
+            parsed["nearest_htb_name"] = poste.get("nom", "")
+            parsed["mw_dispo"] = mw_dispo
+            parsed["zone_saturation"] = s3renr.get("etat", "inconnu")
+            parsed["renforcement_prevu"] = s3renr.get("renforcement")
+            parsed["surface_ha"] = surface_ha
+
+            score_data = compute_score_simple(parsed)
+            ttm = score_data.get("ttm_months", 36)
+            if ttm > max_ttm_months:
+                continue
+
+            parsed["score"] = score_data
+            parsed["poste_rte"] = {
+                "nom": poste.get("nom"),
+                "tension_kv": poste.get("tension_kv"),
+                "mw_dispo": mw_dispo,
+                "etat": s3renr.get("etat"),
+                "renforcement": s3renr.get("renforcement"),
+                "coordinates": poste_coords,
+            }
+            parsed.pop("_id", None)
+            parsed.pop("geometry", None)
+            results.append(parsed)
+
+        return results
+
+    # Run all poste scans in parallel (batches of 4)
+    for i in range(0, len(eligible_postes), 4):
+        batch = eligible_postes[i:i+4]
+        try:
+            batch_results = await asyncio.wait_for(
+                asyncio.gather(*[_scan_poste(p, s) for p, s in batch]),
+                timeout=25
+            )
+            for res in batch_results:
+                candidates.extend(res)
+        except asyncio.TimeoutError:
+            logger.warning(f"Scan batch {i//4} timed out")
+            continue
+
+    # 3. Deduplicate by parcel_id
+    seen = set()
+    unique = []
+    for c in candidates:
+        pid = c.get("parcel_id", "")
+        if pid not in seen:
+            seen.add(pid)
+            unique.append(c)
+
+    # 4. Sort by score
+    unique.sort(key=lambda x: -(x.get("score", {}).get("score", 0)))
+
+    return {
+        "candidates": unique[:limit],
+        "total_found": len(unique),
+        "postes_scanned": len(eligible_postes),
+        "search_params": {
+            "region": region,
+            "max_distance_km": max_distance_km,
+            "min_surface_ha": min_surface_ha,
+            "max_ttm_months": max_ttm_months,
+        },
+    }
+
+
+@api_router.get("/scan/around-poste/{poste_name}")
+async def scan_around_poste(
+    poste_name: str,
+    radius_km: float = 3,
+    min_surface_ha: float = 1,
+):
+    """Scan les parcelles autour d'un poste RTE spécifique."""
+    target_poste = None
+    norm_target = _normalize(poste_name)
+    for poste in _FRANCE_INFRA["postes_htb_all"]:
+        if _normalize(poste.get("nom", "")) == norm_target:
+            target_poste = poste
+            break
+
+    if not target_poste:
+        raise HTTPException(status_code=404, detail=f"Poste '{poste_name}' non trouvé")
+
+    coords = target_poste["geometry"]["coordinates"]
+    enriched = _enrich_poste_with_s3renr(target_poste)
+    s3renr = enriched.get("s3renr", {})
+
+    data = await get_parcelles_around_point(coords[0], coords[1], radius_km * 1000, limit=100)
+
+    parcelles = []
+    for feature in data.get("features", []):
+        parsed = parse_parcelle_feature(feature)
+        surface_ha = (parsed.get("surface_m2") or 0) / 10000
+        if surface_ha < min_surface_ha or not parsed.get("centroid"):
+            continue
+
+        plat = parsed["centroid"]["coordinates"][1]
+        plon = parsed["centroid"]["coordinates"][0]
+        dist_m = _haversine(plon, plat, coords[0], coords[1])
+
+        parsed["dist_poste_htb_m"] = int(dist_m)
+        parsed["tension_htb_kv"] = target_poste.get("tension_kv", 0)
+        parsed["nearest_htb_name"] = target_poste.get("nom", "")
+        parsed["mw_dispo"] = s3renr.get("mw_dispo", 0)
+        parsed["zone_saturation"] = s3renr.get("etat", "inconnu")
+        parsed["renforcement_prevu"] = s3renr.get("renforcement")
+        parsed["surface_ha"] = surface_ha
+
+        score_data = compute_score_simple(parsed)
+        parsed["score"] = score_data
+        parsed.pop("_id", None)
+        parsed.pop("geometry", None)
+        parcelles.append(parsed)
+
+    parcelles.sort(key=lambda x: -(x.get("score", {}).get("score", 0)))
+
+    return {
+        "poste": {
+            "nom": target_poste.get("nom"),
+            "tension_kv": target_poste.get("tension_kv"),
+            "coordinates": coords,
+            "s3renr": s3renr,
+        },
+        "parcelles": parcelles,
+        "count": len(parcelles),
+    }
 
 
 # ═══════════════════════════════════════════════════════════

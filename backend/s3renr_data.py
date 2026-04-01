@@ -207,7 +207,81 @@ S3RENR_DATA = {
             "DECHY": {"mw_reserve": 33, "mw_consomme": 33, "mw_dispo": 0, "etat": "sature", "score_dc": 0},
             "LE THUEL": {"mw_reserve": 61, "mw_consomme": 61, "mw_dispo": 0, "etat": "sature", "renforcement": "Création poste (déc 2026)", "score_dc": 2},
         }
-    }
+    },
+
+    # ═══════════════════════════════════════════
+    # OCCITANIE (estimations ETF 2024-2025)
+    # ═══════════════════════════════════════════
+    "OCC": {
+        "capacite_globale_mw": 3800,
+        "status_global": "DISPONIBLE",
+        "postes": {
+            "GAUDIERE": {"mw_reserve": 410, "mw_consomme": 310, "mw_dispo": 100, "etat": "disponible", "tension_kv": 400, "score_dc": 8},
+            "DONZAC": {"mw_reserve": 300, "mw_consomme": 210, "mw_dispo": 90, "etat": "disponible", "tension_kv": 225, "score_dc": 7},
+            "BAIXAS": {"mw_reserve": 350, "mw_consomme": 280, "mw_dispo": 70, "etat": "disponible", "tension_kv": 225, "score_dc": 7},
+            "TARASCON": {"mw_reserve": 280, "mw_consomme": 220, "mw_dispo": 60, "etat": "disponible", "tension_kv": 225, "score_dc": 6},
+            "LANNEMEZAN": {"mw_reserve": 200, "mw_consomme": 150, "mw_dispo": 50, "etat": "disponible", "tension_kv": 225, "score_dc": 6},
+            "VERFEIL": {"mw_reserve": 180, "mw_consomme": 140, "mw_dispo": 40, "etat": "disponible", "score_dc": 5},
+            "SANILHAC": {"mw_reserve": 150, "mw_consomme": 120, "mw_dispo": 30, "etat": "disponible", "score_dc": 4},
+            "BRENS": {"mw_reserve": 120, "mw_consomme": 100, "mw_dispo": 20, "etat": "disponible", "score_dc": 3},
+            "CORBIERES": {"mw_reserve": 100, "mw_consomme": 90, "mw_dispo": 10, "etat": "disponible", "score_dc": 3},
+            "LÉZIGNAN": {"mw_reserve": 80, "mw_consomme": 75, "mw_dispo": 5, "etat": "contraint", "score_dc": 2},
+        }
+    },
+
+    # ═══════════════════════════════════════════
+    # AUVERGNE-RHÔNE-ALPES (estimations ETF 2024-2025)
+    # ═══════════════════════════════════════════
+    "AuRA": {
+        "capacite_globale_mw": 5200,
+        "status_global": "DISPONIBLE",
+        "postes": {
+            "GENISSIAT": {"mw_reserve": 800, "mw_consomme": 500, "mw_dispo": 300, "etat": "disponible", "tension_kv": 400, "renforcement": "2ème TR 400/225 kV (2028)", "score_dc": 10},
+            "CUSSET": {"mw_reserve": 450, "mw_consomme": 280, "mw_dispo": 170, "etat": "disponible", "tension_kv": 225, "score_dc": 9},
+            "MONTEYNARD": {"mw_reserve": 500, "mw_consomme": 350, "mw_dispo": 150, "etat": "disponible", "tension_kv": 225, "score_dc": 8},
+            "PRATCLAUX": {"mw_reserve": 350, "mw_consomme": 250, "mw_dispo": 100, "etat": "disponible", "tension_kv": 225, "score_dc": 7},
+            "LE CHEYLAS": {"mw_reserve": 400, "mw_consomme": 330, "mw_dispo": 70, "etat": "disponible", "tension_kv": 225, "score_dc": 7},
+            "BOURG-ST-ANDEOL": {"mw_reserve": 250, "mw_consomme": 200, "mw_dispo": 50, "etat": "disponible", "score_dc": 5},
+            "CRENEY": {"mw_reserve": 200, "mw_consomme": 170, "mw_dispo": 30, "etat": "disponible", "score_dc": 4},
+            "VENISSIEUX": {"mw_reserve": 300, "mw_consomme": 280, "mw_dispo": 20, "etat": "contraint", "score_dc": 3},
+            "SAINT-PRIEST": {"mw_reserve": 250, "mw_consomme": 240, "mw_dispo": 10, "etat": "contraint", "score_dc": 2},
+        }
+    },
+
+    # ═══════════════════════════════════════════
+    # GRAND EST (estimations ETF 2024-2025)
+    # ═══════════════════════════════════════════
+    "GES": {
+        "capacite_globale_mw": 3500,
+        "status_global": "DISPONIBLE",
+        "postes": {
+            "BEZAUMONT": {"mw_reserve": 350, "mw_consomme": 200, "mw_dispo": 150, "etat": "disponible", "tension_kv": 400, "score_dc": 9},
+            "MUHLBACH": {"mw_reserve": 300, "mw_consomme": 180, "mw_dispo": 120, "etat": "disponible", "tension_kv": 225, "score_dc": 8},
+            "VIGY": {"mw_reserve": 280, "mw_consomme": 200, "mw_dispo": 80, "etat": "disponible", "tension_kv": 225, "score_dc": 7},
+            "CATTENOM": {"mw_reserve": 400, "mw_consomme": 340, "mw_dispo": 60, "etat": "disponible", "tension_kv": 400, "score_dc": 7},
+            "SCHEER": {"mw_reserve": 200, "mw_consomme": 150, "mw_dispo": 50, "etat": "disponible", "score_dc": 6},
+            "BAINVILLE": {"mw_reserve": 180, "mw_consomme": 140, "mw_dispo": 40, "etat": "disponible", "score_dc": 5},
+            "REIMS-NORD": {"mw_reserve": 150, "mw_consomme": 120, "mw_dispo": 30, "etat": "disponible", "score_dc": 4},
+            "LONNY": {"mw_reserve": 120, "mw_consomme": 100, "mw_dispo": 20, "etat": "contraint", "score_dc": 3},
+        }
+    },
+
+    # ═══════════════════════════════════════════
+    # NOUVELLE-AQUITAINE (estimations ETF 2024-2025)
+    # ═══════════════════════════════════════════
+    "NAQ": {
+        "capacite_globale_mw": 2800,
+        "status_global": "DISPONIBLE",
+        "postes": {
+            "CIVAUX": {"mw_reserve": 500, "mw_consomme": 380, "mw_dispo": 120, "etat": "disponible", "tension_kv": 400, "score_dc": 9},
+            "BRAUD": {"mw_reserve": 400, "mw_consomme": 300, "mw_dispo": 100, "etat": "disponible", "tension_kv": 400, "score_dc": 8},
+            "DOGNON": {"mw_reserve": 300, "mw_consomme": 230, "mw_dispo": 70, "etat": "disponible", "tension_kv": 225, "score_dc": 7},
+            "CUBNEZAIS": {"mw_reserve": 250, "mw_consomme": 200, "mw_dispo": 50, "etat": "disponible", "score_dc": 6},
+            "SABAROTS": {"mw_reserve": 180, "mw_consomme": 140, "mw_dispo": 40, "etat": "disponible", "score_dc": 5},
+            "SAUCATS": {"mw_reserve": 200, "mw_consomme": 170, "mw_dispo": 30, "etat": "disponible", "score_dc": 4},
+            "BIRAC": {"mw_reserve": 150, "mw_consomme": 130, "mw_dispo": 20, "etat": "contraint", "score_dc": 3},
+        }
+    },
 }
 
 
