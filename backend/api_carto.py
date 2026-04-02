@@ -50,19 +50,57 @@ async def get_parcelles_by_commune(code_insee: str, section: Optional[str] = Non
 async def get_parcelle_by_id(parcelle_id: str) -> Optional[Dict[str, Any]]:
     """
     Get a specific parcelle by its ID
-    ID format: DDDCCCSSSNNNN (dept + commune + section + numero)
-    Example: 13055000AI0123
+    ID format 14 chars: CCCCCPPPSSNNN (code_insee 5 + com_abs 3 + section 2 + numero 4)
+    Example: 13039000BS0118 → code_insee=13039, com_abs=000, section=BS, numero=0118
     """
+    pid = parcelle_id.strip().upper()
+
     async with httpx.AsyncClient(timeout=30) as client:
+        # Format 14 chars: 5 code_insee + 3 prefix + 2 section + 4 numero
+        if len(pid) == 14:
+            code_insee = pid[:5]
+            section = pid[8:10]
+            numero = pid[10:14]
+        elif len(pid) >= 9:
+            # Try to detect section (2 alpha chars) position
+            code_insee = pid[:5]
+            rest = pid[5:]
+            # Skip numeric prefix (com_abs), find first alpha pair
+            i = 0
+            while i < len(rest) and rest[i].isdigit():
+                i += 1
+            if i + 2 <= len(rest):
+                section = rest[i:i+2]
+                numero = rest[i+2:]
+            else:
+                section = rest[:2]
+                numero = rest[2:]
+        else:
+            code_insee = pid[:5]
+            section = pid[5:7]
+            numero = pid[7:]
+
         response = await client.get(
             f"{API_CARTO_BASE}/parcelle",
-            params={"code_arr": parcelle_id[:5], "section": parcelle_id[5:7], "numero": parcelle_id[7:]}
+            params={"code_insee": code_insee, "section": section, "numero": numero}
         )
         
         if response.status_code == 200:
             data = response.json()
             if data.get("features"):
                 return data["features"][0]
+
+        # Fallback: try with code_arr parameter
+        if len(pid) >= 9:
+            response2 = await client.get(
+                f"{API_CARTO_BASE}/parcelle",
+                params={"code_arr": code_insee, "section": section, "numero": numero}
+            )
+            if response2.status_code == 200:
+                data2 = response2.json()
+                if data2.get("features"):
+                    return data2["features"][0]
+
         return None
 
 
